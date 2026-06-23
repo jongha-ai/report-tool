@@ -254,7 +254,7 @@
   .r-sec.bg{background:var(--gray);}
   .r-sketch{height:185px;vertical-align:top;white-space:pre-wrap;font-size:12.5px;line-height:1.65;}
   .r-photos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;}
-  .r-photo-cell{border:1px solid #9aa7b8;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
+  .r-photo-cell{border:1px solid #9aa7b8;height:178px;display:flex;align-items:center;justify-content:center;
     overflow:hidden;background:#f4f6f9;}
   .r-photo-cell img{width:100%;height:100%;object-fit:cover;display:block;}
   .r-bigo{height:54px;}
@@ -272,7 +272,7 @@
     .r-title,.r-lab,.r-sec,.r-sec.sk,.r-sec.ph,.r-sec.bg{
       -webkit-print-color-adjust:exact;print-color-adjust:exact;}
     .r-sketch{height:auto!important;min-height:32mm;}
-    .r-photo-cell{aspect-ratio:4/3;height:auto!important;}
+    .r-photo-cell{height:46mm!important;}
     .r-photo-cell img{width:100%!important;height:100%!important;object-fit:cover!important;}
     @page{size:A4 portrait;margin:10mm;}
   }
@@ -985,14 +985,16 @@ function selectRow(name,i){
   fixPhotoCells();  // 사진 셀을 균일 4:3 픽셀높이로 보정 (html2canvas 호환)
 }
 
-// 사진 셀 너비를 읽어 4:3 픽셀 높이를 인라인 주입 — aspect-ratio 미지원 환경(html2canvas) 대비
+// 사진 셀 너비를 읽어 4:3 픽셀 높이를 인라인 주입 — CSS 고정높이(178px) 위에 비율을 한 번 더 보정
 function fixPhotoCells(){
-  requestAnimationFrame(()=>{
+  const apply=()=>{
     document.querySelectorAll('#report .r-photo-cell').forEach(cell=>{
       const w=cell.clientWidth||cell.getBoundingClientRect().width;
-      if(w>0)cell.style.height=Math.round(w*3/4)+'px';
+      if(w>10)cell.style.height=Math.round(w*3/4)+'px';
     });
-  });
+  };
+  apply();                       // 즉시 1회 (이미 렌더된 경우)
+  requestAnimationFrame(apply);  // 다음 프레임 (레이아웃 확정 후)
 }
 
 function esc(v){return v==null?'':String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
