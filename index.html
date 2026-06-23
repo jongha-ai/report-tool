@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>교육 운영 보고서 · Excel to Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+  :root{
+    --navy:#13294b; --navy-2:#1b3a63; --navy-3:#27486f; --navy-deep:#0d1f3a;
+    --blue:#2f6bff; --blue-deep:#1f4fd6;
+    --sky:#eef3fb; --sky-line:#dde7f6;
+    --gold:#c79a3a; --gold-2:#d8af52; --gold-soft:#f5ecd4;
+    --green:#d9ead3; --peach:#fce4d6; --gray:#f2f4f8;
+    --ink:#142036; --muted:#5e6a80; --faint:#94a0b4;
+    --line:#e6ebf2; --bg:#eef1f7; --white:#fff;
+    --ok:#1a8a52; --ok-soft:#e6f6ee; --warn:#b54708;
+    --shadow-sm:0 1px 3px rgba(15,30,60,.06);
+    --shadow-md:0 10px 34px rgba(15,30,60,.10);
+    --shadow-lg:0 26px 60px rgba(15,30,60,.16);
+    --r-lg:20px; --r-md:14px; --r-sm:10px;
+    --hbar:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Pretendard','Pretendard Variable',-apple-system,system-ui,'Malgun Gothic',sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6; letter-spacing:-.01em;
+    -webkit-font-smoothing:antialiased;
+  }
+  .hidden{display:none!important;}
+
+  /* ════════ 상단 헤더바 (공통) ════════ */
+  .topbar{position:sticky;top:0;z-index:40;height:var(--hbar);
+    background:linear-gradient(100deg,var(--navy-deep),var(--navy-2));
+    display:flex;align-items:center;padding:0 26px;gap:14px;
+    box-shadow:0 2px 0 rgba(199,154,58,.5), 0 6px 22px rgba(13,31,58,.28);}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .logo{width:40px;height:40px;border-radius:11px;
+
+    background:linear-gradient(150deg,#21406b,#152f53);
+    border:1px solid rgba(255,255,255,.14);
+    display:flex;align-items:center;justify-content:center;font-size:20px;}
+  .brand .bt{line-height:1.1;}
+  .brand .bt .t{color:#fff;font-weight:800;font-size:16.5px;letter-spacing:-.02em;}
+  .brand .bt .s{color:var(--gold-2);font-size:10.5px;font-weight:700;letter-spacing:.16em;}
+  .topbar .sp{flex:1;}
+  .top-actions{display:flex;gap:10px;}
+  .tbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.06);color:#dfe7f3;font-weight:700;font-size:13.5px;
+    padding:10px 16px;border-radius:10px;cursor:pointer;transition:.15s;font-family:inherit;}
+  .tbtn:hover{background:rgba(255,255,255,.13);color:#fff;}
+  .tbtn.gold{background:linear-gradient(135deg,var(--gold),#b6862c);color:#251a04;border-color:transparent;}
+  .tbtn.gold:hover{filter:brightness(1.06);}
+
+  /* ════════ 화면 1: 대시보드 ════════ */
+  #viewDashboard{position:relative;min-height:calc(100vh - var(--hbar));overflow:hidden;
+    background:
+      radial-gradient(1100px 520px at 88% -8%, #e3ebf8 0%, rgba(227,235,248,0) 60%),
+      radial-gradient(900px 600px at -10% 110%, #e6ecf7 0%, rgba(230,236,247,0) 55%),
+      var(--bg);}
+  .dash-orb{position:absolute;border-radius:50%;pointer-events:none;}
+  .dash-orb.a{width:560px;height:560px;right:-150px;top:60px;
+    background:radial-gradient(circle at 30% 30%,#dde8fa,#eaf0fa);opacity:.7;}
+  .dash-orb.b{width:380px;height:380px;left:-130px;bottom:-120px;
+    background:radial-gradient(circle at 40% 40%,#e4ebf8,#eef2fb);opacity:.7;}
+  .dash-wrap{position:relative;z-index:2;max-width:1180px;margin:0 auto;
+    padding:clamp(40px,7vw,92px) 32px;
+    display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center;min-height:calc(100vh - var(--hbar));}
+
+  .hero .eyebrow{font-size:12px;letter-spacing:.24em;color:var(--navy-3);font-weight:800;
+    display:inline-flex;align-items:center;gap:10px;}
+  .hero .eyebrow::before{content:"";width:26px;height:2px;background:var(--gold);border-radius:2px;}
+  .hero h1{font-size:clamp(38px,5vw,58px);font-weight:800;color:var(--navy);
+    line-height:1.16;letter-spacing:-.035em;margin-top:18px;}
+  .hero h1 .g{color:var(--blue);}
+  .hero p{color:var(--muted);font-size:16.5px;margin-top:20px;max-width:440px;line-height:1.7;}
+  .hero .checks{display:flex;flex-wrap:wrap;gap:18px 26px;margin-top:30px;}
+  .hero .checks .ck{display:inline-flex;align-items:center;gap:9px;font-size:13.5px;
+    font-weight:700;color:var(--navy-2);}
+  .hero .checks .ck svg{flex:none;}
+  .hero .trust{display:flex;gap:34px;margin-top:42px;padding-top:30px;border-top:1px solid var(--sky-line);}
+  .hero .trust .n{font-size:26px;font-weight:800;color:var(--navy);letter-spacing:-.02em;}
+  .hero .trust .l{font-size:12.5px;color:var(--muted);font-weight:600;margin-top:2px;}
+  .hero .trust .gold{color:var(--gold);}
+
+  /* 업로드 카드 */
+  .upload-card{background:var(--white);border:1px solid var(--line);border-radius:24px;
+    box-shadow:var(--shadow-lg);padding:14px;position:relative;}
+  .upload-card::before{content:"";position:absolute;inset:0;border-radius:24px;padding:1px;
+    background:linear-gradient(160deg,rgba(199,154,58,.5),rgba(47,107,255,.18),transparent 60%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;}
+  .drop{border:2px dashed var(--sky-line);border-radius:18px;padding:54px 30px;text-align:center;
+    cursor:pointer;transition:.18s;background:linear-gradient(180deg,#fbfcff,#f3f8ff);}
+  .drop:hover,.drop.over{border-color:var(--blue);background:var(--sky);}
+  .drop .ic{width:64px;height:64px;margin:0 auto;border-radius:18px;
+    background:linear-gradient(150deg,#e8f0ff,#dbe7fc);border:1px solid var(--sky-line);
+    display:flex;align-items:center;justify-content:center;color:var(--blue);}
+  .drop .big{font-weight:800;font-size:18px;margin-top:18px;color:var(--navy);letter-spacing:-.02em;}
+  .drop .small{font-size:13.5px;color:var(--muted);margin-top:8px;}
+  .drop .pick{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;
+    background:linear-gradient(135deg,var(--navy-2),var(--navy));color:#fff;font-weight:800;font-size:15px;
+    padding:14px 34px;border-radius:12px;box-shadow:0 10px 24px rgba(19,41,75,.28);transition:.16s;}
+  .drop:hover .pick{transform:translateY(-1px);box-shadow:0 14px 30px rgba(19,41,75,.34);}
+  .drop .hint{font-size:11.5px;color:var(--faint);margin-top:18px;font-weight:600;letter-spacing:.02em;}
+  .filechip{display:inline-flex;align-items:center;gap:9px;background:var(--sky);
+    border:1px solid var(--sky-line);border-radius:10px;padding:11px 18px;font-size:13.5px;
+    margin:16px auto 4px;color:var(--navy);font-weight:700;}
+
+  /* ════════ 화면 2: 작업뷰 ════════ */
+  #viewWork{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - var(--hbar));}
+  .sidebar{background:var(--white);border-right:1px solid var(--line);overflow-y:auto;padding:22px 18px;}
+  .sb-status{display:flex;align-items:center;gap:12px;background:var(--ok-soft);
+    border:1px solid #c7ead7;border-radius:14px;padding:14px 16px;margin-bottom:22px;}
+  .sb-status .ico{width:34px;height:34px;border-radius:10px;flex:none;
+    background:linear-gradient(135deg,var(--ok),#13703f);color:#fff;
+    display:flex;align-items:center;justify-content:center;}
+  .sb-status .tt{font-size:13.5px;font-weight:800;color:#136b41;}
+  .sb-status .dd{font-size:11.5px;color:#3f7d5d;margin-top:2px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:200px;}
+  .sb-status .re{margin-left:auto;background:#fff;border:1px solid #c7ead7;border-radius:9px;
+    width:34px;height:34px;flex:none;cursor:pointer;color:#136b41;display:flex;align-items:center;
+    justify-content:center;font-size:15px;}
+  .sb-status .re:hover{background:#f3fbf6;}
+
+  .sb-head{display:flex;align-items:center;justify-content:space-between;margin:0 6px 4px;}
+  .sb-head .h{font-size:18px;font-weight:800;color:var(--navy);letter-spacing:-.02em;}
+  .sb-head .cnt{font-size:12px;font-weight:800;color:var(--blue);background:var(--sky);
+    border:1px solid var(--sky-line);border-radius:20px;min-width:26px;height:24px;
+    display:inline-flex;align-items:center;justify-content:center;padding:0 8px;}
+  .sb-sub{font-size:12.5px;color:var(--muted);margin:0 6px 16px;}
+
+  .sb-group{margin-bottom:18px;}
+  .sb-glabel{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;color:var(--navy-2);
+    margin:0 6px 9px;}
+  .sb-glabel .pin{color:var(--gold);}
+  .sb-glabel .gc{margin-left:auto;font-size:11px;color:var(--faint);font-weight:700;}
+  .sb-item{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:13px;
+    padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:.14s;background:#fff;}
+  .sb-item:hover{border-color:var(--sky-line);background:var(--sky);}
+  .sb-item.on{border-color:var(--blue);background:var(--sky);box-shadow:0 0 0 3px rgba(47,107,255,.12);}
+  .sb-item .seq{width:34px;height:34px;border-radius:9px;flex:none;background:var(--gray);
+    color:var(--navy-2);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;}
+  .sb-item.on .seq{background:linear-gradient(135deg,var(--navy-2),var(--navy));color:#fff;}
+  .sb-item .meta{flex:1;min-width:0;}
+  .sb-item .meta .c{font-size:13.5px;font-weight:800;color:var(--navy);letter-spacing:-.02em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sb-item .meta .d{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px;}
+  .sb-item .ph{font-size:11px;font-weight:700;color:var(--blue);background:var(--sky);
+    border:1px solid var(--sky-line);border-radius:16px;padding:2px 8px;flex:none;}
+  .sb-item .ph.zero{color:var(--faint);background:var(--gray);border-color:var(--line);}
+  .sb-item .arr{color:var(--faint);flex:none;}
+
+  /* 본문 미리보기 */
+  .canvas{background:linear-gradient(180deg,#e9eef6,#e2e8f1);overflow-y:auto;padding:0;}
+  .pv-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;
+    padding:16px 30px;background:rgba(233,238,246,.86);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--sky-line);}
+  .pv-bar .live{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:var(--navy);}
+  .pv-bar .live .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);
+    box-shadow:0 0 0 4px rgba(26,138,82,.18);}
+  .pv-bar .fmt{font-size:11.5px;color:var(--muted);font-weight:600;}
+  .pv-bar .sp{flex:1;}
+  .pv-bar .pv-meta{display:flex;gap:20px;}
+  .pv-bar .pv-meta .m{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
+    color:var(--muted);font-weight:600;}
+  .pv-bar .pv-meta .m b{color:var(--navy-2);font-weight:800;}
+
+  #report-host{padding:32px;display:flex;justify-content:center;}
+
+  /* ── 메일 패널(작업뷰 하단 플로팅) ── */
+  .mail-fab{position:fixed;right:30px;bottom:26px;z-index:30;}
+  .mail-card{position:fixed;right:30px;bottom:90px;z-index:31;width:380px;background:#fff;
+    border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);padding:22px;}
+  .mail-card h4{font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;}
+  .mail-card .mh{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
+  label.fld{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px;}
+  input[type=text],input[type=email],textarea{
+    width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 13px;
+    font-size:14px;font-family:inherit;color:var(--ink);background:#fff;transition:.15s;margin-bottom:13px;}
+  input:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(47,107,255,.12);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;
+    border-radius:10px;padding:12px 18px;font-size:14px;font-weight:800;cursor:pointer;
+    transition:.16s;font-family:inherit;}
+  .btn-main{background:linear-gradient(135deg,var(--blue),var(--blue-deep));color:#fff;
+    box-shadow:0 8px 18px rgba(47,107,255,.26);}
+  .btn-main:hover{transform:translateY(-1px);}
+  .btn-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line);}
+  .btn-ghost:hover{background:var(--sky);}
+  .mail-note{font-size:11.5px;color:var(--muted);margin-top:14px;line-height:1.55;
+    background:var(--gray);border-radius:10px;padding:12px 14px;}
+  .mail-note b{color:var(--navy-2);}
+
+  /* 메일 3단계 흐름 */
+  .send-steps{margin-top:8px;}
+  .ss{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);}
+  .ss:last-child{border-bottom:none;}
+  .ss-n{width:26px;height:26px;border-radius:50%;flex:none;background:var(--sky);
+    border:1px solid var(--sky-line);color:var(--blue);font-weight:800;font-size:13px;
+    display:flex;align-items:center;justify-content:center;transition:.18s;}
+  .ss.done .ss-n{background:linear-gradient(135deg,var(--ok),#13703f);color:#fff;border-color:transparent;}
+  .ss-body{flex:1;}
+  .ss-t{font-size:13.5px;font-weight:800;color:var(--navy);letter-spacing:-.02em;}
+  .ss-d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5;}
+  .ss-btn{margin-top:9px;padding:9px 16px;font-size:13px;}
+  .mail-more{margin-top:14px;}
+  .mail-more summary{font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;
+    list-style:none;padding:8px 0;}
+  .mail-more summary::-webkit-details-marker{display:none;}
+  .mail-more summary::before{content:"▸ ";color:var(--faint);}
+  .mail-more[open] summary::before{content:"▾ ";}
+
+  /* 구글 원클릭 발송 */
+  .oc-send{width:100%;margin-top:16px;padding:15px;font-size:15px;
+    background:linear-gradient(135deg,var(--blue),var(--blue-deep));}
+  .oc-send:disabled{background:#aab4c2;cursor:not-allowed;box-shadow:none;}
+  .oc-status{margin-top:14px;font-size:12.5px;line-height:1.6;border-radius:10px;
+    padding:0;max-height:0;overflow:hidden;transition:.25s;}
+  .oc-status.show{padding:12px 14px;max-height:300px;}
+  .oc-status.info{background:var(--sky);color:var(--navy-2);border:1px solid var(--sky-line);}
+  .oc-status.ok{background:var(--ok-soft);color:#136b41;border:1px solid #c7ead7;}
+  .oc-status.err{background:#fdecea;color:#a3261b;border:1px solid #f5c6c0;}
+  .oc-status .stp{display:flex;align-items:center;gap:8px;margin:3px 0;}
+  .oc-status .stp .mk{width:16px;flex:none;text-align:center;}
+  .oc-fallback{margin-top:10px;}
+  .oc-fallback a{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;
+    color:var(--blue);text-decoration:none;}
+  .oc-fallback a:hover{text-decoration:underline;}
+  .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+    border-radius:50%;display:inline-block;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ════════ 보고서 양식 (인쇄 대상 — 원본 유지) ════════ */
+  .report{
+    width:794px;min-height:1123px;background:#fff;margin:0 auto;padding:42px 40px;
+    font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#111827;
+    box-shadow:0 10px 40px rgba(0,0,0,.16);border-radius:4px;
+  }
+  .r-title{background:var(--navy);color:#fff;text-align:center;font-size:22px;font-weight:800;
+    padding:14px;border-radius:4px;letter-spacing:.04em;margin-bottom:20px;}
+  table.r-tbl{width:100%;border-collapse:collapse;}
+  table.r-tbl td{border:1px solid #9aa7b8;padding:7px 10px;font-size:13px;vertical-align:middle;}
+  .r-lab{background:var(--sky);font-weight:700;text-align:center;width:90px;white-space:nowrap;}
+  .r-sec{font-weight:700;text-align:center;padding:8px;font-size:14px;}
+  .r-sec.sk{background:var(--green);}
+  .r-sec.ph{background:var(--peach);}
+  .r-sec.bg{background:var(--gray);}
+  .r-sketch{height:185px;vertical-align:top;white-space:pre-wrap;font-size:12.5px;line-height:1.65;}
+  .r-photos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;}
+  .r-photo-cell{border:1px solid #9aa7b8;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;background:#f4f6f9;}
+  .r-photo-cell img{width:100%;height:100%;object-fit:cover;display:block;}
+  .r-bigo{height:54px;}
+
+  /* ── 인쇄 ── */
+  @media print{
+    html,body{height:auto!important;background:#fff!important;margin:0;padding:0;}
+    body.printing .topbar,body.printing #viewDashboard,body.printing .sidebar,
+    body.printing .pv-bar,body.printing .mail-fab,body.printing .mail-card{display:none!important;}
+    body.printing #viewWork{display:block!important;height:auto!important;}
+    body.printing .canvas{background:#fff!important;overflow:visible!important;padding:0!important;}
+    body.printing #report-host{padding:0!important;}
+    .report{box-shadow:none!important;margin:0 auto;width:100%!important;max-width:190mm;
+      min-height:auto!important;height:auto!important;padding:0;border-radius:0;}
+    .r-title,.r-lab,.r-sec,.r-sec.sk,.r-sec.ph,.r-sec.bg{
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .r-sketch{height:auto!important;min-height:32mm;}
+    .r-photo-cell{aspect-ratio:4/3;height:auto!important;}
+    .r-photo-cell img{width:100%!important;height:100%!important;object-fit:cover!important;}
+    @page{size:A4 portrait;margin:10mm;}
+  }
+
+  @media(max-width:1100px){
+    .dash-wrap{grid-template-columns:1fr;gap:40px;padding:48px 26px;}
+    .hero p{max-width:none;}
+    #viewWork{grid-template-columns:300px 1fr;}
+  }
+  @media(max-width:760px){
+    #viewWork{grid-template-columns:1fr;height:auto;}
+    .sidebar{border-right:none;border-bottom:1px solid var(--line);max-height:46vh;}
+    .canvas{height:auto;}
+    #report-host{padding:18px;}
+    .report{width:100%;padding:24px 18px;}
+    .mail-card{right:12px;left:12px;width:auto;}
+  }
+
+#certApp{--blue:#0f8a7e;--blue-deep:#0a6b61;--sky:#e9f6f3;--sky-line:#cfe9e3;}
+#certApp *{box-sizing:border-box;margin:0;padding:0;}
+#certApp html,#certApp body{height:100%;}
+#certApp body{font-family:'Pretendard','Pretendard Variable',-apple-system,system-ui,'Malgun Gothic',sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;}
+#certApp .hidden{display:none!important;}
+#certApp .topbar{position:sticky;top:0;z-index:40;height:var(--hbar);
+    background:linear-gradient(100deg,var(--navy-deep),var(--navy-2));
+    display:flex;align-items:center;padding:0 26px;gap:14px;
+    box-shadow:0 2px 0 rgba(199,154,58,.5),0 6px 22px rgba(13,31,58,.28);}
+#certApp .brand{display:flex;align-items:center;gap:12px;}
+#certApp .brand .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(150deg,#21406b,#152f53);
+    border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-size:20px;}
+#certApp .brand .bt .t{color:#fff;font-weight:800;font-size:16.5px;letter-spacing:-.02em;}
+#certApp .brand .bt .s{color:var(--gold-2);font-size:10.5px;font-weight:700;letter-spacing:.16em;}
+#certApp .topbar .sp{flex:1;}
+#certApp .top-actions{display:flex;gap:10px;}
+#certApp .tbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.06);color:#dfe7f3;font-weight:700;font-size:13.5px;
+    padding:10px 16px;border-radius:10px;cursor:pointer;transition:.15s;font-family:inherit;}
+#certApp .tbtn:hover{background:rgba(255,255,255,.13);color:#fff;}
+#certApp .tbtn.gold{background:linear-gradient(135deg,var(--gold),#b6862c);color:#251a04;border-color:transparent;}
+#certApp .tbtn.gold:hover{filter:brightness(1.06);}
+#certApp .tbtn:disabled{opacity:.5;cursor:not-allowed;}
+#certApp /* 대시보드 */
+  #viewDashboard{position:relative;min-height:calc(100vh - var(--hbar));overflow:hidden;
+    background:radial-gradient(1100px 520px at 88% -8%,#e0f1ed 0%,rgba(224,241,237,0) 60%),
+      radial-gradient(900px 600px at -10% 110%,#e6f2ef 0%,rgba(230,242,239,0) 55%),var(--bg);}
+#certApp .dash-wrap{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:clamp(40px,7vw,92px) 32px;
+    display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center;min-height:calc(100vh - var(--hbar));}
+#certApp .hero .eyebrow{font-size:12px;letter-spacing:.24em;color:var(--navy-3);font-weight:800;display:inline-flex;align-items:center;gap:10px;}
+#certApp .hero .eyebrow::before{content:"";width:26px;height:2px;background:var(--gold);border-radius:2px;}
+#certApp .hero h1{font-size:clamp(36px,5vw,54px);font-weight:800;color:var(--navy);line-height:1.18;letter-spacing:-.035em;margin-top:18px;}
+#certApp .hero h1 .g{color:var(--blue);}
+#certApp .hero p{color:var(--muted);font-size:16.5px;margin-top:20px;max-width:440px;line-height:1.7;}
+#certApp .hero .checks{display:flex;flex-wrap:wrap;gap:16px 24px;margin-top:30px;}
+#certApp .hero .ck{display:inline-flex;align-items:center;gap:9px;font-size:13.5px;font-weight:700;color:var(--navy-2);}
+#certApp .hero .trust{display:flex;gap:34px;margin-top:42px;padding-top:30px;border-top:1px solid var(--sky-line);}
+#certApp .hero .trust .n{font-size:24px;font-weight:800;color:var(--navy);}
+#certApp .hero .trust .n.gold{color:var(--gold);}
+#certApp .hero .trust .l{font-size:12.5px;color:var(--muted);font-weight:600;margin-top:2px;}
+#certApp .upload-card{background:var(--white);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow-lg);padding:14px;position:relative;}
+#certApp .upload-card::before{content:"";position:absolute;inset:0;border-radius:24px;padding:1px;
+    background:linear-gradient(160deg,rgba(199,154,58,.5),rgba(47,107,255,.18),transparent 60%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;}
+#certApp .drop{border:2px dashed var(--sky-line);border-radius:18px;padding:54px 30px;text-align:center;cursor:pointer;transition:.18s;
+    background:linear-gradient(180deg,#fbfcff,#f3f8ff);}
+#certApp .drop:hover,#certApp .drop.over{border-color:var(--blue);background:var(--sky);}
+#certApp .drop .ic{width:64px;height:64px;margin:0 auto;border-radius:18px;background:linear-gradient(150deg,#e8f0ff,#dbe7fc);
+    border:1px solid var(--sky-line);display:flex;align-items:center;justify-content:center;color:var(--blue);}
+#certApp .drop .big{font-weight:800;font-size:18px;margin-top:18px;color:var(--navy);letter-spacing:-.02em;}
+#certApp .drop .small{font-size:13.5px;color:var(--muted);margin-top:8px;}
+#certApp .drop .pick{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;
+    background:linear-gradient(135deg,var(--navy-2),var(--navy));color:#fff;font-weight:800;font-size:15px;
+    padding:14px 34px;border-radius:12px;box-shadow:0 10px 24px rgba(19,41,75,.28);transition:.16s;}
+#certApp .drop:hover .pick{transform:translateY(-1px);}
+#certApp .drop .hint{font-size:11.5px;color:var(--faint);margin-top:18px;font-weight:600;}
+#certApp .filechip{display:inline-flex;align-items:center;gap:9px;background:var(--sky);border:1px solid var(--sky-line);
+    border-radius:10px;padding:11px 18px;font-size:13.5px;margin:16px auto 4px;color:var(--navy);font-weight:700;}
+#certApp /* 작업뷰 */
+  #viewWork{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - var(--hbar));}
+#certApp .sidebar{background:var(--white);border-right:1px solid var(--line);overflow-y:auto;padding:22px 18px;}
+#certApp .sb-status{display:flex;align-items:center;gap:12px;background:var(--ok-soft);border:1px solid #c7ead7;border-radius:14px;padding:14px 16px;margin-bottom:22px;}
+#certApp .sb-status .ico{width:34px;height:34px;border-radius:10px;flex:none;background:linear-gradient(135deg,var(--ok),#13703f);color:#fff;display:flex;align-items:center;justify-content:center;}
+#certApp .sb-status .tt{font-size:13.5px;font-weight:800;color:#136b41;}
+#certApp .sb-status .dd{font-size:11.5px;color:#3f7d5d;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+#certApp .sb-status .re{margin-left:auto;background:#fff;border:1px solid #c7ead7;border-radius:9px;width:34px;height:34px;flex:none;cursor:pointer;color:#136b41;display:flex;align-items:center;justify-content:center;font-size:15px;}
+#certApp .sb-head{display:flex;align-items:center;justify-content:space-between;margin:0 6px 4px;}
+#certApp .sb-head .h{font-size:18px;font-weight:800;color:var(--navy);}
+#certApp .sb-head .cnt{font-size:12px;font-weight:800;color:var(--blue);background:var(--sky);border:1px solid var(--sky-line);border-radius:20px;min-width:26px;height:24px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px;}
+#certApp .sb-sub{font-size:12.5px;color:var(--muted);margin:0 6px 16px;}
+#certApp .sb-item{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:.14s;background:#fff;}
+#certApp .sb-item:hover{border-color:var(--sky-line);background:var(--sky);}
+#certApp .sb-item.on{border-color:var(--blue);background:var(--sky);box-shadow:0 0 0 3px rgba(47,107,255,.12);}
+#certApp .sb-item .av{width:36px;height:36px;border-radius:50%;flex:none;background:var(--gray);color:var(--navy-2);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;}
+#certApp .sb-item.on .av{background:linear-gradient(135deg,var(--navy-2),var(--navy));color:#fff;}
+#certApp .sb-item .meta{flex:1;min-width:0;}
+#certApp .sb-item .meta .c{font-size:13.5px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#certApp .sb-item .meta .d{font-size:11.5px;color:var(--muted);margin-top:3px;}
+#certApp .sb-item .arr{color:var(--faint);flex:none;}
+#certApp .sb-bulk{margin-top:14px;}
+#certApp .sb-bulk .btn-bulk{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px solid var(--sky-line);
+    background:var(--sky);color:var(--navy);font-weight:800;font-size:13.5px;padding:13px;border-radius:12px;cursor:pointer;transition:.15s;font-family:inherit;}
+#certApp .sb-bulk .btn-bulk:hover{border-color:var(--blue);}
+#certApp .canvas{background:linear-gradient(180deg,#e9eef6,#e2e8f1);overflow-y:auto;}
+#certApp .pv-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;padding:16px 30px;
+    background:rgba(233,238,246,.86);backdrop-filter:blur(8px);border-bottom:1px solid var(--sky-line);}
+#certApp .pv-bar .live{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:var(--navy);}
+#certApp .pv-bar .live .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(26,138,82,.18);}
+#certApp .pv-bar .fmt{font-size:11.5px;color:var(--muted);font-weight:600;}
+#certApp .pv-bar .sp{flex:1;}
+#certApp #cert-docHost{padding:32px;display:flex;justify-content:center;}
+#certApp /* 미리보기(확인서) — 화면용 재현 */
+  .doc{width:760px;background:#fff;border:1.5px solid #808080;padding:34px 40px;box-shadow:0 10px 40px rgba(0,0,0,.16);
+    font-family:'Malgun Gothic','맑은 고딕',serif;color:#111;font-size:14px;line-height:1.7;}
+#certApp .doc .title{text-align:center;font-weight:800;font-size:24px;letter-spacing:.18em;margin-bottom:22px;}
+#certApp .doc .line{margin:7px 0;}
+#certApp .doc .v{color:var(--red);}
+#certApp .doc .ind{padding-left:28px;}
+#certApp .doc table.ilsi{border-collapse:collapse;margin:8px 0 8px 40px;width:60%;}
+#certApp .doc table.ilsi td,#certApp .doc table.ilsi th{border:1px solid #808080;padding:5px 8px;text-align:center;font-size:13px;}
+#certApp .doc table.ilsi th{background:#dce6f1;font-weight:700;}
+#certApp .doc .tax{text-align:right;font-size:11.5px;margin:4px 0 16px;}
+#certApp .doc .confirm{text-align:center;margin:16px 0 8px;}
+#certApp .doc .date{text-align:center;margin:6px 0;}
+#certApp .doc .name{text-align:center;margin:6px 0 18px;}
+#certApp .doc .corp{text-align:center;font-weight:800;font-size:20px;margin:14px 0;}
+#certApp .doc .privacy{margin-top:26px;border-collapse:collapse;width:100%;font-size:11.5px;}
+#certApp .doc .privacy td,#certApp .doc .privacy th{border:1px solid #808080;padding:7px 9px;vertical-align:top;}
+#certApp .doc .privacy th{background:#dce6f1;text-align:center;font-weight:700;}
+#certApp .doc .privacy .chk{text-align:center;}
+@media(max-width:980px){#certApp .dash-wrap{grid-template-columns:1fr;gap:40px;padding:48px 26px;}
+#certApp .hero p{max-width:none;}
+#certApp #cert-viewWork{grid-template-columns:300px 1fr;}}
+
+@media(max-width:760px){#certApp #cert-viewWork{grid-template-columns:1fr;height:auto;}
+#certApp .sidebar{border-right:none;border-bottom:1px solid var(--line);max-height:46vh;}
+#certApp .canvas{height:auto;}
+#certApp .doc{width:100%;padding:24px 18px;}}
+
+
+/* ===== HUB (도구 선택) ===== */
+#viewHub{position:relative;min-height:calc(100vh - var(--hbar));overflow:hidden;
+  background:radial-gradient(1100px 520px at 50% -10%,#e7eefb 0%,rgba(231,238,251,0) 60%),var(--bg);
+  display:flex;align-items:center;justify-content:center;padding:48px 28px;}
+.hub-wrap{max-width:980px;width:100%;}
+.hub-head{text-align:center;margin-bottom:44px;}
+.hub-head .eyebrow{font-size:12px;letter-spacing:.24em;color:var(--gold);font-weight:800;}
+.hub-head h1{font-size:clamp(30px,4vw,44px);font-weight:800;color:var(--navy);letter-spacing:-.03em;margin-top:14px;line-height:1.2;}
+.hub-head p{color:var(--muted);font-size:16px;margin-top:14px;}
+.hub-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:start;}
+.hub-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:34px 30px;cursor:pointer;min-width:0;
+  box-shadow:var(--shadow-md);transition:.18s;position:relative;overflow:hidden;}
+.hub-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);}
+.hub-card .ic{width:60px;height:60px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;}
+.hub-card.hcReport .ic{background:linear-gradient(135deg,#2f6bff,#1f4fd6);}
+.hub-card.hcCert .ic{background:linear-gradient(135deg,#0f8a7e,#0a6b61);}
+.hub-card .tag{position:absolute;top:22px;right:24px;font-size:11px;font-weight:800;padding:5px 11px;border-radius:20px;}
+.hub-card.hcReport .tag{background:#eaf1ff;color:#1f4fd6;}
+.hub-card.hcCert .tag{background:#e3f4f0;color:#0a6b61;}
+.hub-card h2{font-size:21px;font-weight:800;color:var(--navy);margin-top:20px;letter-spacing:-.02em;overflow-wrap:break-word;}
+.hub-card p{color:var(--muted);font-size:14px;margin-top:10px;line-height:1.6;overflow-wrap:break-word;word-break:keep-all;}
+.hub-card .go{margin-top:20px;display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:800;}
+.hub-card.hcReport .go{color:#1f4fd6;}
+.hub-card.hcCert .go{color:#0a6b61;}
+.hub-foot{text-align:center;margin-top:34px;font-size:12.5px;color:var(--faint);}
+.topbar.is-cert{background:linear-gradient(100deg,#0a3d37,#0f5b52);box-shadow:0 2px 0 rgba(199,154,58,.5),0 6px 22px rgba(10,40,36,.3);}
+@media(max-width:760px){.hub-grid{grid-template-columns:1fr;}}
+
+</style>
+</head>
+<body>
+
+<!-- ════ 헤더바 ════ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" id="hdrLogo">📄</div>
+    <div class="bt">
+      <div class="t" id="hdrTitle">상상우리 자동화 도구</div>
+      <div class="s" id="hdrSub">SANGSANGWOORI AUTOMATION</div>
+    </div>
+  </div>
+  <div class="sp"></div>
+  <div class="top-actions hidden" id="workActions">
+    <button class="tbtn" id="btnHome">← 대시보드로</button>
+    <button class="tbtn gold" id="btnPrint">⤓ PDF 다운로드</button>
+  </div>
+  <div class="top-actions hidden" id="certActionsTop">
+    <button class="tbtn" id="cert-btnHome">← 대시보드로</button>
+    <button class="tbtn gold" id="cert-btnDownload">⤓ 워드(.docx) 저장</button>
+  </div>
+</header>
+
+<!-- ════ 화면 1: 대시보드 ════ -->
+<!-- ===== 허브: 도구 선택 ===== -->
+<div id="viewHub">
+  <div class="hub-wrap">
+    <div class="hub-head">
+      <div class="eyebrow">SANGSANGWOORI · AUTOMATION</div>
+      <h1>어떤 작업을 하시겠어요?</h1>
+      <p>엑셀 파일을 올리면 보고서와 강의확인서를 자동으로 만들어 드립니다.</p>
+    </div>
+    <div class="hub-grid">
+      <div class="hub-card hcReport" id="cardReport">
+        <span class="tag">교육 운영</span>
+        <div class="ic">📄</div>
+        <h2>교육 운영 결과 보고서</h2>
+        <p>진행사항 엑셀(사진 포함)을 양식 그대로 보고서로 만들고, 구글 드라이브 저장과 메일 발송까지 한 번에.</p>
+        <span class="go">시작하기 →</span>
+      </div>
+      <div class="hub-card hcCert" id="cardCert">
+        <span class="tag">강사 지급</span>
+        <div class="ic">📝</div>
+        <h2>강의·실습 확인서</h2>
+        <p>강사 명단 엑셀에서 강사별 확인서를 워드(.docx)로 자동 작성. 전체 강사 일괄 생성도 가능.</p>
+        <span class="go">시작하기 →</span>
+      </div>
+    </div>
+    <div class="hub-foot">모든 처리는 브라우저 안에서만 이뤄지며, 데이터는 외부로 전송되지 않습니다 · 추가 비용 없음</div>
+  </div>
+</div>
+
+<div id="reportApp" class="hidden">
+<main id="viewDashboard">
+  <div class="dash-orb a"></div>
+  <div class="dash-orb b"></div>
+  <div class="dash-wrap">
+    <section class="hero">
+      <div class="eyebrow">DAILY EDUCATION REPORT</div>
+      <h1>엑셀 한 번으로,<br><span class="g">운영 보고서</span>를 완성합니다</h1>
+      <p>교육 데이터와 셀 위에 삽입된 현장 사진을 자동으로 읽어, 제출 양식 그대로 미리보기와 A4 PDF를 만들어 드립니다.</p>
+      <div class="checks">
+        <span class="ck"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#e6f6ee"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#1a8a52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>셀 데이터 자동 입력</span>
+        <span class="ck"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#e6f6ee"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#1a8a52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>삽입 사진 위치 분석</span>
+        <span class="ck"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#e6f6ee"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#1a8a52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>A4 PDF 출력</span>
+      </div>
+      <div class="trust">
+        <div><div class="n">0<span style="font-size:16px">원</span></div><div class="l">추가 비용 · 유료 API 없음</div></div>
+        <div><div class="n gold">외부 전송 0</div><div class="l">회사 PC 안에서만 처리</div></div>
+        <div><div class="n">A4 1매</div><div class="l">제출 양식 그대로</div></div>
+      </div>
+    </section>
+
+    <section class="upload-card">
+      <div class="drop" id="drop">
+        <div class="ic">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 01-.8-7.92A5.5 5.5 0 0117.6 9.2 3.5 3.5 0 0117 18h-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v7M9 15l3-3 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="big">진행사항 엑셀을 업로드하세요</div>
+        <div class="small">파일을 끌어다 놓거나 아래 버튼을 눌러 선택하세요.</div>
+        <div class="pick">파일 선택</div>
+        <div class="hint">.xlsx · 처리는 브라우저 안에서만 이뤄지며 파일은 외부로 전송되지 않습니다</div>
+        <div id="filechip-wrap"></div>
+        <input type="file" id="file" accept=".xlsx,.xls" class="hidden" />
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ════ 화면 2: 작업뷰 ════ -->
+<div id="viewWork" class="hidden">
+  <!-- 사이드바 -->
+  <aside class="sidebar">
+    <div class="sb-status">
+      <div class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4L19 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="min-width:0">
+        <div class="tt">파일 분석 완료</div>
+        <div class="dd" id="sbFileName">—</div>
+      </div>
+      <button class="re" id="btnReupload" title="다른 파일 올리기">↺</button>
+    </div>
+
+    <div class="sb-head">
+      <div class="h">교육 회차</div>
+      <div class="cnt" id="sbTotal">0</div>
+    </div>
+    <div class="sb-sub">미리볼 회차를 선택하세요.</div>
+
+    <div id="sheetGroups"></div>
+
+    <!-- 기존 로직 호환용 숨김 셀렉트 -->
+    <select id="sheetSel" class="hidden"></select>
+    <div id="rowList" class="hidden"></div>
+  </aside>
+
+  <!-- 미리보기 캔버스 -->
+  <section class="canvas">
+    <div class="pv-bar">
+      <span class="live"><span class="dot"></span>보고서 미리보기</span>
+      <span class="fmt">A4 · 제출 양식 기준</span>
+      <div class="sp"></div>
+      <div class="pv-meta">
+        <span class="m">📍 <b id="pvLoc">—</b></span>
+        <span class="m">👥 <b id="pvAtt">—</b></span>
+      </div>
+    </div>
+    <div id="report-host"><div class="report" id="report"></div></div>
+  </section>
+</div>
+
+<!-- 메일 플로팅 -->
+<button class="tbtn gold mail-fab hidden" id="btnMail" style="box-shadow:var(--shadow-md)">✉ 저장 &amp; 메일 발송</button>
+<div class="mail-card hidden" id="mailCard">
+  <h4>구글 드라이브 저장 &amp; 메일 발송</h4>
+  <div class="mh">버튼 한 번으로 드라이브에 보관하고 주무관에게 PDF를 첨부해 보냅니다.</div>
+
+  <label class="fld">받는 사람 (주무관 이메일)</label>
+  <input type="email" id="mTo" placeholder="report@gg.go.kr">
+
+  <details class="mail-more" id="mailDetails">
+    <summary>제목·본문·저장 폴더 보기</summary>
+    <label class="fld" style="margin-top:12px">제목</label>
+    <input type="text" id="mSubj">
+    <label class="fld">본문</label>
+    <textarea id="mBody" rows="3"></textarea>
+    <label class="fld">드라이브 저장 폴더 이름</label>
+    <input type="text" id="mFolder" value="생애전환교육 운영보고">
+  </details>
+
+  <div class="oc-status" id="ocStatus"></div>
+
+  <button class="btn btn-main oc-send" id="btnSendAll">
+    <span id="sendLabel">드라이브 저장 + 메일 발송</span>
+  </button>
+
+  <div class="oc-fallback" id="ocFallback"></div>
+
+  <div class="mail-note" id="ocNote"><b>한 번 로그인하면 끝.</b> 처음 한 번 구글 로그인으로 권한을 허용하면, 이후에는 버튼 한 번에 드라이브 저장과 발송이 함께 처리됩니다.</div>
+</div>
+
+</div><!-- /reportApp -->
+
+<div id="certApp" class="hidden">
+<main id="cert-viewDashboard">
+  <div class="dash-wrap">
+    <section class="hero">
+      <div class="eyebrow">EXCEL TO WORD</div>
+      <h1>강사 명단에서,<br><span class="g">확인서 한 번에</span> 자동 작성</h1>
+      <p>강사 명단 엑셀을 올리면, 강의·실습 확인서 양식에 맞춰 강사별 문서를 자동으로 만들어 드립니다. 워드(.docx) 파일이라 필요할 때 바로 수정할 수 있습니다.</p>
+      <div class="checks">
+        <span class="ck">✓ 강사별 자동 작성</span>
+        <span class="ck">✓ 양식 그대로 유지</span>
+        <span class="ck">✓ 워드 편집 가능</span>
+      </div>
+      <div class="trust">
+        <div><div class="n">0<span style="font-size:15px">원</span></div><div class="l">추가 비용 없음</div></div>
+        <div><div class="n gold">외부 전송 0</div><div class="l">PC 안에서만 처리</div></div>
+        <div><div class="n">한 번에</div><div class="l">전체 강사 일괄 생성</div></div>
+      </div>
+    </section>
+    <section class="upload-card">
+      <div class="drop" id="cert-drop">
+        <div class="ic">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 01-.8-7.92A5.5 5.5 0 0117.6 9.2 3.5 3.5 0 0117 18h-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v7M9 15l3-3 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="big">강사 명단 엑셀을 업로드하세요</div>
+        <div class="small">강사명·강의명·생년월일·연락처·계좌·금액 등이 담긴 엑셀(.xlsx)</div>
+        <div class="pick">파일 선택</div>
+        <div class="hint">.xlsx · 모든 처리는 브라우저 안에서만 이뤄지며 외부로 전송되지 않습니다</div>
+        <div id="cert-filechip-wrap"></div>
+        <input type="file" id="cert-file" accept=".xlsx,.xls" class="hidden" />
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- 작업뷰 -->
+<div id="cert-viewWork" class="hidden">
+  <aside class="sidebar">
+    <div class="sb-status">
+      <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4L19 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div style="min-width:0"><div class="tt">명단 분석 완료</div><div class="dd" id="cert-sbFileName">—</div></div>
+      <button class="re" id="cert-btnReupload" title="다른 파일 올리기">↺</button>
+    </div>
+    <div class="sb-head"><div class="h">강사 목록</div><div class="cnt" id="cert-sbTotal">0</div></div>
+    <div class="sb-sub">확인서를 만들 강사를 선택하세요.</div>
+    <div id="cert-teacherList"></div>
+    <div class="sb-bulk">
+      <button class="btn-bulk" id="cert-btnBulk">⤓ 전체 강사 확인서 한 번에 저장</button>
+    </div>
+  </aside>
+  <section class="canvas">
+    <div class="pv-bar">
+      <span class="live"><span class="dot"></span>확인서 미리보기</span>
+      <span class="fmt">A4 · 제출 양식 기준</span>
+      <div class="sp"></div>
+    </div>
+    <div id="cert-docHost"></div>
+  </section>
+</div>
+
+
+</div><!-- /certApp -->
+
+<script>
+const $=s=>document.querySelector(s);
+let workbook=null, sheetData={}, sheetImages={}, sheetCols={}, current=null;
+
+// ── 파일 업로드 핸들링 ──
+const drop=$('#drop'), fileInput=$('#file');
+drop.addEventListener('click',()=>fileInput.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');
+  if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+
+async function handleFile(file){
+  $('#filechip-wrap').innerHTML=`<div class="filechip">📎 ${file.name}</div>`;
+  $('#sbFileName').textContent=file.name;
+  const buf=await file.arrayBuffer();
+  workbook=XLSX.read(buf,{type:'array'});
+  await extractImages(buf);
+  buildSheetData();
+  buildSidebar();
+  goWork();
+}
+
+// ── 화면 전환 ──
+function goWork(){
+  $('#viewDashboard').classList.add('hidden');
+  $('#viewWork').classList.remove('hidden');
+  $('#workActions').classList.remove('hidden');
+  $('#btnPrint').classList.remove('hidden');
+  $('#btnMail').classList.remove('hidden');
+  window.scrollTo(0,0);
+}
+function goHome(){
+  $('#viewWork').classList.add('hidden');
+  $('#btnMail').classList.add('hidden');
+  $('#mailCard').classList.add('hidden');
+  $('#btnPrint').classList.add('hidden');
+  $('#viewDashboard').classList.remove('hidden');
+}
+$('#btnReupload').onclick=()=>{goHome();fileInput.value='';$('#filechip-wrap').innerHTML='';};
+
+// ── 허브(도구 선택) 라우팅 ──
+function showHub(){
+  $('#viewHub').classList.remove('hidden');
+  $('#reportApp').classList.add('hidden');
+  $('#certApp').classList.add('hidden');
+  $('#workActions').classList.add('hidden');
+  $('#certActionsTop').classList.add('hidden');
+  $('#btnMail').classList.add('hidden');
+  $('#mailCard').classList.add('hidden');
+  document.querySelector('.topbar').classList.remove('is-cert');
+  $('#hdrLogo').textContent='📄';
+  $('#hdrTitle').textContent='상상우리 자동화 도구';
+  $('#hdrSub').textContent='SANGSANGWOORI AUTOMATION';
+  window.scrollTo(0,0);
+}
+window.showHub=showHub;
+function openReport(){
+  $('#viewHub').classList.add('hidden');
+  $('#certApp').classList.add('hidden');
+  $('#reportApp').classList.remove('hidden');
+  document.querySelector('.topbar').classList.remove('is-cert');
+  $('#hdrLogo').textContent='📄';
+  $('#hdrTitle').textContent='교육 운영 보고서';
+  $('#hdrSub').textContent='EXCEL TO REPORT';
+  // 보고서는 내부 대시보드(업로드) 화면부터
+  goHome();
+  $('#workActions').classList.remove('hidden'); // 네비(도구 선택으로)는 표시
+  $('#btnPrint').classList.add('hidden');       // PDF는 업로드 후 표시
+  window.scrollTo(0,0);
+}
+function openCert(){
+  $('#viewHub').classList.add('hidden');
+  $('#reportApp').classList.add('hidden');
+  $('#certApp').classList.remove('hidden');
+  $('#certActionsTop').classList.remove('hidden');  // 네비 + 다운로드 모두 표시
+  $('#cert-btnDownload').classList.remove('hidden');
+  document.querySelector('.topbar').classList.add('is-cert');
+  $('#hdrLogo').textContent='📝';
+  $('#hdrTitle').textContent='강의·실습 확인서';
+  $('#hdrSub').textContent='EXCEL TO WORD';
+  window.scrollTo(0,0);
+}
+$('#cardReport').onclick=openReport;
+$('#cardCert').onclick=openCert;
+$('#btnHome').onclick=showHub;   // 보고서 → 허브
+// 보고서 진입 시 대시보드에서 업로드하면 workActions 표시되도록 goWork에서 처리됨
+
+
+// ── 텍스트/이미지 파싱 (원본 로직 유지) ──
+function buildSheetData(){
+  sheetData={}; sheetCols={};
+  workbook.SheetNames.forEach(name=>{
+    const ws=workbook.Sheets[name];
+    const ref=ws['!ref']; if(!ref){sheetData[name]=[];return;}
+    const range=XLSX.utils.decode_range(ref);
+    const baseCol=range.s.c;                    // 데이터 시작 절대열 (예: B=1)
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false,blankrows:true});
+
+    // 헤더 행 찾기 ('과정명'이 있는 행)
+    let hIdx=-1;
+    for(let r=0;r<Math.min(rows.length,6);r++){
+      if((rows[r]||[]).some(v=>v&&String(v).includes('과정명'))){hIdx=r;break;}
+    }
+    if(hIdx<0)hIdx=2;
+    const header=rows[hIdx]||[];
+    const find=(...names)=>{
+      for(let i=0;i<header.length;i++){
+        const h=String(header[i]||'').replace(/\s/g,'');
+        if(names.some(n=>h.includes(n)))return i;
+      }return -1;
+    };
+    const col={
+      number:find('연번'), course:find('과정명'), session:find('차시'),
+      date:find('날짜'), time:find('시간'), location:find('장소'),
+      apply:find('신청자'), attend:find('참석자'), sketch:find('현장스케치','스케치')
+    };
+    // 사진 열: '사진1'~'사진6'의 인덱스를 절대열로 환산해 저장
+    const photoAbsCols=[];
+    for(let n=1;n<=6;n++){
+      const idx=find('사진'+n);
+      if(idx>=0)photoAbsCols.push(baseCol+idx+1); // 절대열(1-based)
+    }
+    sheetCols[name]={baseCol,photoAbsCols};
+
+    const recs=[];
+    for(let r=hIdx+1;r<rows.length;r++){
+      const row=rows[r]||[];
+      const course=row[col.course];
+      if(!course||String(course).trim()==='')continue;
+      recs.push({
+        excelRow:r+1,
+        number:row[col.number], course:String(course).replace(/\u00a0/g,' ').trim(),
+        session:row[col.session], date:row[col.date], time:row[col.time],
+        location:row[col.location], apply:row[col.apply], attend:row[col.attend],
+        sketch:(row[col.sketch]||'')
+      });
+    }
+    sheetData[name]=recs;
+  });
+}
+
+// ── 이미지 추출 (xlsx zip 직접 파싱) ──
+async function extractImages(buf){
+  sheetImages={};
+  const JSZ=await loadJSZip();
+  const zip=await JSZ.loadAsync(buf);
+
+  // 1) sheetN.xml ↔ 시트이름 매핑
+  const wbXml=await zip.file('xl/workbook.xml').async('string');
+  const relsXml=await zip.file('xl/_rels/workbook.xml.rels').async('string');
+  const parser=new DOMParser();
+  const wbDoc=parser.parseFromString(wbXml,'application/xml');
+  const relDoc=parser.parseFromString(relsXml,'application/xml');
+  const relMap={};
+  relDoc.querySelectorAll('Relationship').forEach(n=>relMap[n.getAttribute('Id')]=n.getAttribute('Target'));
+  const sheetFileByName={};
+  wbDoc.querySelectorAll('sheets > sheet').forEach(n=>{
+    const nm=n.getAttribute('name');
+    const rid=n.getAttribute('r:id')||n.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
+    let tgt=relMap[rid]||'';
+    sheetFileByName[nm]=tgt.replace(/^\/?xl\//,'').replace(/^worksheets\//,'');
+  });
+
+  for(const name of workbook.SheetNames){
+    sheetImages[name]={};
+    const sheetFile=sheetFileByName[name];           // e.g. sheet1.xml
+    if(!sheetFile)continue;
+    const wsRelsPath=`xl/worksheets/_rels/${sheetFile}.rels`;
+    const wsRelsFile=zip.file(wsRelsPath);
+    if(!wsRelsFile)continue;
+    const wsRels=parser.parseFromString(await wsRelsFile.async('string'),'application/xml');
+    let drawingTarget=null;
+    wsRels.querySelectorAll('Relationship').forEach(n=>{
+      if((n.getAttribute('Type')||'').includes('drawing'))drawingTarget=n.getAttribute('Target');
+    });
+    if(!drawingTarget)continue;
+    const drawingFile=drawingTarget.replace(/^\.\.\//,'xl/').replace(/^\/?xl\//,'xl/');
+    const drawPath=drawingFile.startsWith('xl/')?drawingFile:('xl/'+drawingFile.replace(/^xl\//,''));
+    const drawFileObj=zip.file(drawPath)||zip.file('xl/drawings/'+drawingTarget.split('/').pop());
+    if(!drawFileObj)continue;
+    const drawXml=parser.parseFromString(await drawFileObj.async('string'),'application/xml');
+    // drawing rels (이미지 파일 연결)
+    const drawName=drawPath.split('/').pop();
+    const drawRelsObj=zip.file(`xl/drawings/_rels/${drawName}.rels`);
+    const drawRelMap={};
+    if(drawRelsObj){
+      const dr=parser.parseFromString(await drawRelsObj.async('string'),'application/xml');
+      dr.querySelectorAll('Relationship').forEach(n=>drawRelMap[n.getAttribute('Id')]=n.getAttribute('Target'));
+    }
+    // 각 앵커(anchor)에서 from row/col + 이미지 rId 추출
+    const anchors=[...drawXml.querySelectorAll('twoCellAnchor, oneCellAnchor')];
+    for(const an of anchors){
+      const fromRow=parseInt(an.querySelector('from > row')?.textContent ?? '-1');
+      const fromCol=parseInt(an.querySelector('from > col')?.textContent ?? '-1');
+      const blip=an.querySelector('blip');
+      if(!blip)continue;
+      const embed=blip.getAttribute('r:embed')||blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','embed');
+      let imgTarget=drawRelMap[embed];
+      if(!imgTarget)continue;
+      const imgPath=('xl/'+imgTarget.replace(/^\.\.\//,'')).replace(/xl\/xl\//,'xl/');
+      const imgObj=zip.file(imgPath)||zip.file('xl/media/'+imgTarget.split('/').pop());
+      if(!imgObj)continue;
+      const b64=await imgObj.async('base64');
+      const ext=(imgTarget.split('.').pop()||'png').toLowerCase();
+      const mime=ext==='jpg'||ext==='jpeg'?'image/jpeg':ext==='png'?'image/png':'image/'+ext;
+      const key=(fromRow+1)+'_'+(fromCol+1);    // 1-based row_col
+      // 같은 칸에 사진이 여러 벌 겹쳐 있으면, 나중 것(실제 사진)으로 덮어씀
+      sheetImages[name][key]=`data:${mime};base64,${b64}`;
+    }
+  }
+}
+
+function loadJSZip(){
+  return new Promise((res,rej)=>{
+    if(window.JSZip)return res(window.JSZip);
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=()=>res(window.JSZip);s.onerror=rej;document.head.appendChild(s);
+  });
+}
+
+
+
+// ── 사이드바(캠퍼스별 회차 목록) ──
+function buildSidebar(){
+  const host=$('#sheetGroups'); host.innerHTML='';
+  // 숨김 셀렉트도 동기화(기존 로직 호환)
+  const sel=$('#sheetSel'); sel.innerHTML='';
+  let total=0, firstName=null, firstIdx=0, picked=false;
+
+  workbook.SheetNames.forEach(name=>{
+    const recs=sheetData[name]||[];
+    if(recs.length===0)return;
+    total+=recs.length;
+    const o=document.createElement('option');o.value=name;o.textContent=name;sel.appendChild(o);
+
+    const group=document.createElement('div');group.className='sb-group';
+    group.innerHTML=`<div class="sb-glabel"><span class="pin">◉</span>${esc(name)}<span class="gc">${recs.length}개 회차</span></div>`;
+
+    recs.forEach((rec,i)=>{
+      let pc=0;const pcols=sheetCols[name]?.photoAbsCols||[];
+      pcols.forEach(c=>{if(sheetImages[name]&&sheetImages[name][rec.excelRow+'_'+c])pc++;});
+      const seq=String(i+1).padStart(2,'0');
+      const item=document.createElement('div');
+      item.className='sb-item';
+      item.dataset.name=name; item.dataset.i=i;
+      item.innerHTML=`
+        <div class="seq">${seq}</div>
+        <div class="meta">
+          <div class="c">${esc(rec.course||'(과정명 없음)')}</div>
+          <div class="d">📅 ${esc(rec.date||'')}${rec.session?(' · '+esc(rec.session)+' 차시'):''}</div>
+        </div>
+        <span class="ph ${pc===0?'zero':''}">사진 ${pc}</span>
+        <span class="arr">›</span>`;
+      item.onclick=()=>selectRow(name,i);
+      group.appendChild(item);
+
+      if(!picked){firstName=name;firstIdx=i;picked=true;}
+    });
+    host.appendChild(group);
+  });
+
+  $('#sbTotal').textContent=total;
+  if(picked)selectRow(firstName,firstIdx);
+}
+
+// ── 보고서 렌더 ──
+function selectRow(name,i){
+  const rec=sheetData[name][i];current={name,i,rec};
+  const imgs=[];
+  const pcols=sheetCols[name]?.photoAbsCols||[];
+  for(let p=0;p<6;p++){
+    const c=pcols[p];
+    imgs.push(c?(sheetImages[name]?.[rec.excelRow+'_'+c]||null):null);
+  }
+  let cells='';
+  for(let p=0;p<6;p++){
+    cells+=`<div class="r-photo-cell">${imgs[p]?`<img src="${imgs[p]}">`:''}</div>`;
+  }
+  $('#report').innerHTML=`
+    <div class="r-title">교육 운영 결과 보고</div>
+    <table class="r-tbl">
+      <colgroup><col style="width:11%"><col style="width:22.5%"><col style="width:11%"><col style="width:22.5%"><col style="width:11%"><col style="width:22%"></colgroup>
+      <tr><td class="r-lab">과정명</td><td colspan="5">${esc(rec.course)}</td></tr>
+      <tr><td class="r-lab">일자</td><td>${esc(rec.date)}</td>
+          <td class="r-lab">시간</td><td>${esc(rec.time)}</td>
+          <td class="r-lab">차시</td><td>${esc(rec.session)}</td></tr>
+      <tr><td class="r-lab">장소</td><td>${esc(rec.location)}</td>
+          <td class="r-lab">신청자</td><td>${esc(rec.apply)}</td>
+          <td class="r-lab">참석자</td><td>${esc(rec.attend)}</td></tr>
+    </table>
+    <table class="r-tbl" style="margin-top:14px;">
+      <tr><td class="r-sec sk">현장 스케치</td></tr>
+      <tr><td class="r-sketch">${esc(rec.sketch)}</td></tr>
+    </table>
+    <table class="r-tbl" style="margin-top:14px;">
+      <tr><td class="r-sec ph">현장 사진</td></tr>
+    </table>
+    <div class="r-photos">${cells}</div>
+    <table class="r-tbl" style="margin-top:14px;">
+      <colgroup><col style="width:11%"><col style="width:89%"></colgroup>
+      <tr><td class="r-sec bg">비고</td><td class="r-bigo"></td></tr>
+    </table>`;
+  // 미리보기 상단 메타 갱신
+  const loc = rec.location ? esc(rec.location) : '장소 미입력';
+  const att = rec.attend!=null && rec.attend!=='' ? esc(rec.attend)+'명 참석' : '참석 인원 미입력';
+  $('#pvLoc').textContent = loc;
+  $('#pvAtt').textContent = att;
+  // 사이드바 활성 표시
+  document.querySelectorAll('.sb-item').forEach(el=>el.classList.remove('on'));
+  const active=document.querySelector(`.sb-item[data-name="${CSS.escape(name)}"][data-i="${i}"]`);
+  if(active){active.classList.add('on');active.scrollIntoView({block:'nearest'});}
+  prepMail(rec);
+  fixPhotoCells();  // 사진 셀을 균일 4:3 픽셀높이로 보정 (html2canvas 호환)
+}
+
+// 사진 셀 너비를 읽어 4:3 픽셀 높이를 인라인 주입 — aspect-ratio 미지원 환경(html2canvas) 대비
+function fixPhotoCells(){
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('#report .r-photo-cell').forEach(cell=>{
+      const w=cell.clientWidth||cell.getBoundingClientRect().width;
+      if(w>0)cell.style.height=Math.round(w*3/4)+'px';
+    });
+  });
+}
+
+function esc(v){return v==null?'':String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── 인쇄 / PDF (헤더 'PDF 다운로드' 버튼용) ──
+function doPrint(){
+  const origTitle=document.title;
+  if(current&&current.rec){
+    const d=fmtDate(current.rec.date).replace(' ','');
+    document.title=`${d}_생애전환교육 운영 진행사항`;
+  }
+  document.body.classList.add('printing');
+  window.print();
+  setTimeout(()=>{
+    document.body.classList.remove('printing');
+    document.title=origTitle;
+  },300);
+}
+$('#btnPrint').onclick=doPrint;
+
+// ── 메일 본문 자동 작성 ──
+function prepMail(rec){
+  const dateShort=fmtDate(rec.date);
+  $('#mSubj').value=`[상상우리_행복캠퍼스] 생애전환교육 운영 일간 진행사항 보고`;
+  $('#mBody').value=`안녕하세요. ${dateShort} [ ${rec.course} ] 과정 운영 진행사항 보고드립니다.`;
+  hideStatus();
+}
+function fmtDate(d){
+  if(!d)return'';
+  const s=String(d);
+  let m=s.match(/\d{4}\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+  if(m)return`${+m[1]}월 ${+m[2]}일`;
+  m=s.match(/\d{4}-(\d{1,2})-(\d{1,2})/);
+  if(m)return`${+m[1]}월 ${+m[2]}일`;
+  return s;
+}
+function pdfFileName(){
+  const d=current&&current.rec?fmtDate(current.rec.date).replace(' ',''):'보고서';
+  return `${d}_생애전환교육 운영 진행사항.pdf`;
+}
+
+let mailOpen=false;
+$('#btnMail').onclick=()=>{mailOpen=!mailOpen;$('#mailCard').classList.toggle('hidden',!mailOpen);};
+
+/* ════════════════════════════════════════════════════════
+   구글 연동 설정  —  배포 시 이 값만 채우면 작동합니다
+   (구글 클라우드 콘솔 > 사용자 인증 정보 > OAuth 클라이언트 ID)
+   ════════════════════════════════════════════════════════ */
+const GOOGLE_CLIENT_ID = "1045439660755-2rnsi4snjhjun489riuqqtaom4jfsjko.apps.googleusercontent.com"; // 예: "1234567890-abcde.apps.googleusercontent.com"
+const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send";
+
+let tokenClient=null, accessToken=null;
+
+// ── 상태 표시 헬퍼 ──
+function showStatus(type, html){
+  const el=$('#ocStatus'); el.className='oc-status show '+type; el.innerHTML=html;
+}
+function hideStatus(){ const el=$('#ocStatus'); el.className='oc-status'; el.innerHTML=''; $('#ocFallback').innerHTML=''; }
+function setBusy(busy, label){
+  $('#btnSendAll').disabled=busy;
+  $('#sendLabel').innerHTML = busy ? `<span class="spinner"></span> ${label||'처리 중…'}` : (label||'드라이브 저장 + 메일 발송');
+}
+
+// ── 보고서 DOM → A4 PDF (jsPDF + html2canvas) ──
+async function buildPdfBlob(){
+  const node=$('#report');
+  fixPhotoCells();                       // 캡처 전 사진 셀 4:3 픽셀높이 확정
+  await new Promise(r=>setTimeout(r,60)); // 보정 반영 대기
+  const canvas=await html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,
+    onclone:(doc)=>{                       // 클론 문서에도 동일 높이 주입(html2canvas는 aspect-ratio 미지원)
+      doc.querySelectorAll('#report .r-photo-cell').forEach(cell=>{
+        const w=cell.clientWidth||238; cell.style.height=Math.round(w*3/4)+'px';
+        const im=cell.querySelector('img'); if(im){im.style.width='100%';im.style.height='100%';im.style.objectFit='cover';}
+      });
+    }});
+  const img=canvas.toDataURL('image/jpeg',0.92);
+  const { jsPDF }=window.jspdf;
+  const pdf=new jsPDF('p','mm','a4');
+  const pw=210, ph=297, margin=8;
+  const iw=pw-margin*2;
+  const ih=canvas.height*iw/canvas.width;
+  let left=ih, posY=margin;
+  if(ih<=ph-margin*2){
+    pdf.addImage(img,'JPEG',margin,margin,iw,ih);
+  }else{
+    // 여러 페이지로 분할
+    let sY=0; const pageH=(ph-margin*2)*canvas.width/iw;
+    while(sY<canvas.height){
+      const slice=document.createElement('canvas');
+      slice.width=canvas.width; slice.height=Math.min(pageH,canvas.height-sY);
+      slice.getContext('2d').drawImage(canvas,0,sY,canvas.width,slice.height,0,0,canvas.width,slice.height);
+      const simg=slice.toDataURL('image/jpeg',0.92);
+      const sih=slice.height*iw/canvas.width;
+      if(sY>0)pdf.addPage();
+      pdf.addImage(simg,'JPEG',margin,margin,iw,sih);
+      sY+=slice.height;
+    }
+  }
+  return pdf.output('blob');
+}
+
+// ── 구글 토큰 요청 ──
+function ensureToken(){
+  return new Promise((resolve,reject)=>{
+    if(!window.google||!google.accounts||!google.accounts.oauth2){
+      return reject(new Error('google-not-loaded'));
+    }
+    if(!tokenClient){
+      tokenClient=google.accounts.oauth2.initTokenClient({
+        client_id:GOOGLE_CLIENT_ID,
+        scope:GOOGLE_SCOPES,
+        callback:(resp)=>{
+          if(resp.error)return reject(new Error(resp.error));
+          accessToken=resp.access_token; resolve(accessToken);
+        }
+      });
+    }
+    tokenClient.callback=(resp)=>{
+      if(resp.error)return reject(new Error(resp.error));
+      accessToken=resp.access_token; resolve(accessToken);
+    };
+    tokenClient.requestAccessToken({prompt: accessToken?'':'consent'});
+  });
+}
+
+// ── 드라이브: 폴더 찾기/만들기 ──
+async function ensureFolder(name){
+  const q=encodeURIComponent(`name='${name.replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  let r=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
+    {headers:{Authorization:'Bearer '+accessToken}});
+  let d=await r.json();
+  if(d.files&&d.files.length)return d.files[0].id;
+  r=await fetch('https://www.googleapis.com/drive/v3/files',{
+    method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+    body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder'})});
+  d=await r.json(); return d.id;
+}
+
+// ── 드라이브: PDF 업로드 ──
+async function uploadToDrive(blob, filename, folderId){
+  const meta={name:filename, parents:folderId?[folderId]:undefined};
+  const boundary='-------oc'+Date.now();
+  const head=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`;
+  const foot=`\r\n--${boundary}--`;
+  const body=new Blob([head, blob, foot]);
+  const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{
+    method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'multipart/related; boundary='+boundary},
+    body});
+  if(!r.ok)throw new Error('drive-upload-failed');
+  return r.json(); // {id, webViewLink}
+}
+
+// ── Gmail: PDF 첨부 메일 발송 ──
+async function sendGmail(to, subject, bodyText, blob, filename){
+  const b64=await blobToBase64(blob);
+  const enc=s=>'=?UTF-8?B?'+btoa(unescape(encodeURIComponent(s)))+'?=';
+  const boundary='-------gm'+Date.now();
+  const mime=[
+    'MIME-Version: 1.0',
+    `To: ${to}`,
+    `Subject: ${enc(subject)}`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    btoa(unescape(encodeURIComponent(bodyText))),
+    '',
+    `--${boundary}`,
+    `Content-Type: application/pdf; name="${filename}"`,
+    'Content-Transfer-Encoding: base64',
+    `Content-Disposition: attachment; filename="${filename}"`,
+    '',
+    b64,
+    '',
+    `--${boundary}--`
+  ].join('\r\n');
+  const raw=btoa(unescape(encodeURIComponent(mime))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
+    method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
+    body:JSON.stringify({raw})});
+  if(!r.ok)throw new Error('gmail-send-failed');
+  return r.json();
+}
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=()=>res(fr.result.split(',')[1]);
+    fr.onerror=rej; fr.readAsDataURL(blob);
+  });
+}
+
+// ── 폴백: 설정 전이거나 실패 시, PDF 저장 + 메일 작성 안내 ──
+async function fallbackFlow(reason){
+  let blob;
+  try{ blob=await buildPdfBlob(); }catch(e){ blob=null; }
+  if(blob){
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=pdfFileName(); a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+  }
+  const to=encodeURIComponent($('#mTo').value.trim());
+  const su=encodeURIComponent($('#mSubj').value);
+  const bo=encodeURIComponent($('#mBody').value);
+  $('#ocFallback').innerHTML=`<a href="mailto:${to}?subject=${su}&body=${bo}">✉ 메일 창 열기 (방금 저장한 PDF를 첨부하세요)</a>`;
+  showStatus('info',
+    `<div class="stp"><span class="mk">✓</span>보고서를 PDF로 저장했습니다.</div>`+
+    `<div class="stp"><span class="mk">→</span>아래 ‘메일 창 열기’를 눌러 PDF를 첨부해 보내세요.</div>`+
+    (reason==='not-configured'
+      ? `<div class="stp" style="margin-top:8px;color:var(--muted)"><span class="mk">ℹ</span>구글 계정 연동을 설정하면 이 단계 없이 버튼 한 번에 자동 발송됩니다.</div>`
+      : ``));
+  setBusy(false);
+}
+
+// ── 메인: 저장 + 발송 원클릭 ──
+$('#btnSendAll').onclick=async()=>{
+  hideStatus();
+  const to=$('#mTo').value.trim();
+  if(!to){ showStatus('err','받는 사람 이메일을 입력해 주세요.'); return; }
+
+  // 구글 미설정 → 폴백
+  if(!GOOGLE_CLIENT_ID){
+    setBusy(true,'PDF 생성 중…');
+    await fallbackFlow('not-configured');
+    return;
+  }
+
+  try{
+    setBusy(true,'구글 로그인 확인 중…');
+    await ensureToken();
+
+    setBusy(true,'보고서 PDF 생성 중…');
+    showStatus('info',`<div class="stp"><span class="spinner" style="border-top-color:var(--blue)"></span>PDF를 만들고 있습니다…</div>`);
+    const blob=await buildPdfBlob();
+    const fname=pdfFileName();
+
+    setBusy(true,'드라이브에 저장 중…');
+    showStatus('info',
+      `<div class="stp"><span class="mk">⏳</span>드라이브에 저장 중…</div>`);
+    const folderId=await ensureFolder($('#mFolder').value.trim()||'생애전환교육 운영보고');
+    const up=await uploadToDrive(blob,fname,folderId);
+
+    setBusy(true,'메일 발송 중…');
+    showStatus('info',
+      `<div class="stp"><span class="mk">✓</span>드라이브 저장 완료</div>`+
+      `<div class="stp"><span class="mk">⏳</span>메일 발송 중…</div>`);
+    await sendGmail(to,$('#mSubj').value,$('#mBody').value,blob,fname);
+
+    showStatus('ok',
+      `<div class="stp"><span class="mk">✓</span><b>완료되었습니다.</b></div>`+
+      `<div class="stp"><span class="mk">·</span>드라이브 폴더에 PDF 보관됨${up.webViewLink?` (<a href="${up.webViewLink}" target="_blank" style="color:#136b41;text-decoration:underline">열기</a>)`:''}</div>`+
+      `<div class="stp"><span class="mk">·</span>${esc(to)} 으로 PDF 첨부 메일 발송됨</div>`);
+    setBusy(false,'다시 보내기');
+  }catch(err){
+    // 실패 시 안전하게 폴백
+    showStatus('err',`자동 발송 중 문제가 생겨, 수동 방식으로 전환합니다. (${esc(String(err.message||err))})`);
+    await fallbackFlow('error');
+  }
+};
+
+
+
+/* ===== 강의확인서 모듈 (격리 스코프) ===== */
+(function(){
+
+const $=s=>document.querySelector(s);
+let rows=[], cols=null, current=0;
+
+const drop=$('#cert-drop'), fileInput=$('#cert-file');
+drop.addEventListener('click',()=>fileInput.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+
+async function handleFile(file){
+  $('#cert-filechip-wrap').innerHTML=`<div class="filechip">📎 ${file.name}</div>`;
+  $('#cert-sbFileName').textContent=file.name;
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  expandMerges(ws);  // 병합셀(과목명 등)을 범위 전체에 채움 — SheetJS는 자동으로 안 풀어줌
+  const grid=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false,blankrows:false});
+  parseGrid(grid);
+  if(rows.length===0){alert('강사 데이터를 찾지 못했습니다. 헤더(강사명 등)가 있는지 확인해 주세요.');return;}
+  buildList(); goWork();
+}
+
+// 병합셀 전개: 각 병합범위 좌상단 값을 범위 전체 셀에 복사 (과목명이 블록 단위로 병합돼 있음)
+function expandMerges(ws){
+  if(!ws||!ws['!merges'])return;
+  ws['!merges'].forEach(m=>{
+    const tl=XLSX.utils.encode_cell({r:m.s.r,c:m.s.c});
+    const src=ws[tl];
+    if(!src||src.v===undefined||src.v===null)return;
+    for(let R=m.s.r;R<=m.e.r;R++)for(let C=m.s.c;C<=m.e.c;C++){
+      const ad=XLSX.utils.encode_cell({r:R,c:C});
+      if(!ws[ad])ws[ad]={t:src.t,v:src.v,w:src.w};
+    }
+  });
+}
+// 주민번호 → 생년월일 앞 6자리 추출
+function toBirth(v){
+  const s=String(v==null?'':v).trim();
+  if(/^\d{6}-/.test(s))return s.split('-')[0];
+  if(/^\d{6,}$/.test(s))return s.slice(0,6);
+  return s;
+}
+function toNum(v){const n=parseInt(String(v==null?'':v).replace(/[^\d]/g,''),10);return isNaN(n)?0:n;}
+function comma(n){try{return Number(n).toLocaleString('ko-KR');}catch(e){return String(n);}}
+
+// 헤더 기반 동적 매핑 + 강사별 그룹핑
+function parseGrid(grid){
+  rows=[]; cols=null;
+  let hIdx=-1;
+  for(let r=0;r<Math.min(grid.length,10);r++){
+    if((grid[r]||[]).some(v=>{const h=String(v||'').replace(/\s/g,'');return h==='강사'||h.includes('강사명');})){hIdx=r;break;}
+  }
+  if(hIdx<0)hIdx=0;
+  const header=grid[hIdx]||[];
+  const find=(...names)=>{
+    for(let i=0;i<header.length;i++){
+      const h=String(header[i]||'').replace(/\s/g,'');
+      if(names.some(n=>h===n||h.includes(n)))return i;
+    }return -1;
+  };
+  cols={
+    강의명:find('강의명','과정명','과목명','과목'), 강사명:find('강사명','강사','성명','이름'),
+    소속직위:find('소속','직위'), 생년월일:find('생년월일','생년','주민'),
+    연락처:find('연락처','전화','휴대'), 은행명:find('은행'),
+    계좌번호:find('계좌'), 금액:find('지급액','금액','강사료'),
+    날짜:find('날짜','일자'), 시간:find('시간'), 시수:find('시수','차시'),
+    운영내용:find('운영내용','운영','내용'), 확인일자:find('확인일','작성일')
+  };
+  // 강사명 컬럼이 없으면(=완전 미스) 빈 결과
+  if(cols.강사명<0)return;
+
+  const order=[]; const map={};
+  for(let r=hIdx+1;r<grid.length;r++){
+    const row=grid[r]||[];
+    const g=(k)=>cols[k]>=0?(row[cols[k]]??''):'';
+    const name=String(g('강사명')).trim();
+    if(!name)continue;
+    if(!map[name]){
+      map[name]={강사명:name,강의명set:[],소속직위:'',생년월일:'',연락처:'',은행명:'',계좌번호:'',금액합:0,ilsi:[],운영내용:'',확인일자:''};
+      order.push(name);
+    }
+    const t=map[name];
+    const course=String(g('강의명')).trim();
+    if(course&&!t.강의명set.includes(course))t.강의명set.push(course);
+    t.ilsi.push({날짜:String(g('날짜')).trim(),시간:String(g('시간')).trim(),시수:String(g('시수')).trim()});
+    t.금액합+=toNum(g('금액'));
+    ['소속직위','연락처','은행명','계좌번호','운영내용','확인일자'].forEach(k=>{
+      if(!t[k]&&String(g(k)).trim())t[k]=String(g(k)).trim();
+    });
+    if(!t.생년월일){const b=toBirth(g('생년월일'));if(b)t.생년월일=b;}
+  }
+  rows=order.map(n=>{const t=map[n];return{
+    강의명:t.강의명set.join(' / '), 강사명:t.강사명, 소속직위:t.소속직위, 생년월일:t.생년월일,
+    연락처:t.연락처, 은행명:t.은행명, 계좌번호:t.계좌번호, 금액:comma(t.금액합),
+    ilsi:t.ilsi.length?t.ilsi:[{날짜:'',시간:'',시수:''}],
+    운영내용:t.운영내용, 확인일자:t.확인일자
+  };});
+}
+
+function goWork(){$('#cert-viewDashboard').classList.add('hidden');$('#cert-viewWork').classList.remove('hidden');document.querySelector('#certActionsTop').classList.remove('hidden');document.querySelector('#cert-btnDownload').classList.remove('hidden');window.scrollTo(0,0);}
+function goHome(){$('#cert-viewWork').classList.add('hidden');$('#cert-viewDashboard').classList.remove('hidden');}
+$('#cert-btnHome').onclick=()=>{ if(window.showHub)window.showHub(); };
+$('#cert-btnReupload').onclick=()=>{goHome();fileInput.value='';$('#cert-filechip-wrap').innerHTML='';};
+
+function buildList(){
+  const host=$('#cert-teacherList');host.innerHTML='';
+  rows.forEach((rec,i)=>{
+    const div=document.createElement('div');
+    div.className='sb-item'+(i===0?' on':'');
+    div.innerHTML=`<div class="av">${esc((rec.강사명||'?').slice(0,1))}</div>
+      <div class="meta"><div class="c">${esc(rec.강사명||'(이름 없음)')}</div>
+      <div class="d">${esc(rec.강의명||'')}</div></div><span class="arr">›</span>`;
+    div.onclick=()=>selectTeacher(i);
+    host.appendChild(div);
+  });
+  $('#cert-sbTotal').textContent=rows.length;
+  selectTeacher(0);
+}
+
+function selectTeacher(i){
+  current=i;
+  document.querySelectorAll('.sb-item').forEach((el,idx)=>el.classList.toggle('on',idx===i));
+  renderPreview(rows[i]);
+}
+
+function esc(v){return v==null?'':String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function vSpan(v){return v?`<span class="v">${esc(v)}</span>`:'';}
+
+function renderPreview(rec){
+  const ilsiRows=(rec.ilsi&&rec.ilsi.length?rec.ilsi.slice():[]);
+  while(ilsiRows.length<3)ilsiRows.push({날짜:'',시간:'',시수:''});  // 최소 3줄 유지
+  const ilsiHtml=ilsiRows.map(r=>`<tr><td>${vSpan(r.날짜)}</td><td>${vSpan(r.시간)}</td><td>${vSpan(r.시수)}</td></tr>`).join('');
+  const 확인일자=rec.확인일자||'2025. 12. 11.';
+  $('#cert-docHost').innerHTML=`
+    <div class="doc">
+      <div class="title">강 의 · 실 습 확 인 서</div>
+      <div class="line">강의명 : ${vSpan(rec.강의명)}</div>
+      <div class="line">일  시 :</div>
+      <table class="ilsi"><tr><th>날짜</th><th>시간</th><th>시수</th></tr>${ilsiHtml}</table>
+      <div class="line">운영내용 : ${vSpan(rec.운영내용)}</div>
+      <div class="line" style="margin-top:14px">강   사 : ${vSpan(rec.강사명)}</div>
+      <div class="line ind">- 소속 및 직위 : ${vSpan(rec.소속직위)}</div>
+      <div class="line ind">- 생 년 월 일  : ${vSpan(rec.생년월일)}</div>
+      <div class="line ind">- 연   락   처  : ${vSpan(rec.연락처)}</div>
+      <div class="line ind">- 입 금 계 좌 : ${vSpan(rec.은행명)} ${vSpan(rec.계좌번호)}</div>
+      <div class="line ind">- 지 급 금 액  :  ₩${vSpan(rec.금액)}원(세전) *실습비용일체포함</div>
+      <div class="tax">( * 실 수령액은 세금 8.8% 공제 후 지급됨)</div>
+      <div class="confirm">상기와 같이 강의 및 실습을 수행하였음을 확인합니다.</div>
+      <div class="date">${esc(확인일자)}</div>
+      <div class="name">이름: ${vSpan(rec.강사명)}  (서명)</div>
+      <div class="corp">(주) 상상우리</div>
+      <table class="privacy">
+        <tr><th colspan="3">개인정보처리방침 안내 및 개인정보수집 동의서</th><th>정보 주체 서명</th></tr>
+        <tr><td colspan="3">○ 귀하는 개인정보제공을 거부할 수 있습니다. 단, 이 경우 수당을 지급하지 않게 됩니다.<br>○ 제공된 개인정보는 소득세법에 따라 제공일자가 포함된 회계연도를 기준으로 5년간 보관되며, 관련법령에 따라 신고의 의무가 있거나, 적법한 요청이 있는 경우를 제외하고는 제3자에게 제공하지 않습니다.</td><td></td></tr>
+        <tr><th colspan="2">[개인정보 처리]</th><th colspan="2">[고유식별정보의 처리]</th></tr>
+        <tr><td colspan="2">본인은 개인정보처리방침에 동의하며, 수당 지급을 위하여 성명, 소속 및 직위, 주소, 은행 및 계좌정보 등의 개인정보를 제공하는 것에 동의합니다.</td><td colspan="2">본인은 소득세법에 따른 소득신고를 위하여 본인의 고유식별번호(주민등록번호)를 제공하는 것에 동의합니다.</td></tr>
+        <tr><td class="chk">□ 동의</td><td class="chk">□ 미동의</td><td class="chk">□ 동의</td><td class="chk">□ 미동의</td></tr>
+      </table>
+    </div>`;
+}
+
+/* ════════ 워드(.docx) 생성 ════════ */
+let D = window.docx;
+function ensureDocx(){ if(!D) D=window.docx; return D; }
+const RED='C00000', HEADER_FILL='DCE6F1', FULL_W=9400;
+const thin={style:D.BorderStyle.SINGLE,size:4,color:'808080'};
+const cellBorders={top:thin,bottom:thin,left:thin,right:thin};
+
+function tr(text,size,opts={}){return new D.TextRun(Object.assign({text:String(text),size:size},opts));}
+function redLine(label,value,size=22,indent){
+  const runs=[tr(label,size)];
+  if(value)runs.push(tr(value,size,{color:RED}));
+  return new D.Paragraph({children:runs,spacing:{before:60,after:60},indent:indent?{left:indent}:undefined});
+}
+function ilsiTableDocx(rec){
+  const col=[3009,3009,3008];
+  const head=['날짜','시간','시수'];
+  const headerRow=new D.TableRow({children:head.map((h,i)=>new D.TableCell({
+    borders:cellBorders,width:{size:col[i],type:D.WidthType.DXA},shading:{fill:HEADER_FILL,type:D.ShadingType.CLEAR},
+    margins:{top:40,bottom:40,left:80,right:80},verticalAlign:D.VerticalAlign.CENTER,
+    children:[new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[tr(h,20)]})]}))});
+  const data=(rec.ilsi&&rec.ilsi.length?rec.ilsi.slice():[]);
+  while(data.length<3)data.push({날짜:'',시간:'',시수:''});  // 최소 3줄 유지
+  const body=data.map(r=>new D.TableRow({children:[r.날짜,r.시간,r.시수].map((v,i)=>new D.TableCell({
+    borders:cellBorders,width:{size:col[i],type:D.WidthType.DXA},margins:{top:40,bottom:40,left:80,right:80},verticalAlign:D.VerticalAlign.CENTER,
+    children:[new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[tr(v||'',20,v?{color:RED}:{})]})]}))}));
+  return new D.Table({width:{size:6018,type:D.WidthType.DXA},columnWidths:col,indent:{size:560,type:D.WidthType.DXA},rows:[headerRow,...body]});
+}
+function bodyContent(rec){
+  const 확인일자=rec.확인일자||'2025. 12. 11.';
+  const out=[];
+  out.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,spacing:{before:60,after:160},children:[tr('강 의 · 실 습 확 인 서',32,{bold:true})]}));
+  out.push(new D.Paragraph({spacing:{before:40,after:80},children:[tr('강의명 : ',22),tr(rec.강의명||'',22,{color:RED})]}));
+  out.push(new D.Paragraph({spacing:{after:40},children:[tr('일  시 : ',22)]}));
+  out.push(ilsiTableDocx(rec));
+  out.push(new D.Paragraph({spacing:{before:120,after:40},children:[tr('운영내용 : ',22),tr(rec.운영내용||'',22,{color:RED})]}));
+  out.push(new D.Paragraph({spacing:{before:100,after:30},children:[tr('강   사 : ',22),tr(rec.강사명||'',22,{color:RED})]}));
+  out.push(redLine('        - 소속 및 직위 : ',rec.소속직위));
+  out.push(redLine('        - 생 년 월 일  : ',rec.생년월일));
+  out.push(redLine('        - 연   락   처  : ',rec.연락처));
+  out.push(new D.Paragraph({spacing:{before:40,after:40},children:[tr('        - 입 금 계 좌 : ',22),tr(rec.은행명||'',22,{color:RED}),tr(' ',22),tr(rec.계좌번호||'',22,{color:RED})]}));
+  out.push(new D.Paragraph({spacing:{before:40,after:40},children:[tr('        - 지 급 금 액  :  ₩',22),tr(rec.금액||'',22,{color:RED}),tr('원(세전) *실습비용일체포함',22)]}));
+  out.push(new D.Paragraph({alignment:D.AlignmentType.RIGHT,spacing:{after:140},children:[tr('( * 실 수령액은 세금 8.8% 공제 후 지급됨)',18)]}));
+  out.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,spacing:{before:80,after:120},children:[tr('상기와 같이 강의 및 실습을 수행하였음을 확인합니다.',22)]}));
+  out.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,spacing:{after:140},children:[tr(확인일자,22)]}));
+  out.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,spacing:{after:160},children:[tr('이름: ',22),tr(rec.강사명||'',22,{color:RED}),tr('  (서명)',22)]}));
+  out.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,spacing:{before:80,after:80},children:[tr('(주) 상상우리',28,{bold:true})]}));
+  return out;
+}
+function privacyTableDocx(){
+  const c4=[2350,2350,2350,2350];
+  const hc=(t,span)=>new D.TableCell({borders:cellBorders,columnSpan:span,shading:{fill:HEADER_FILL,type:D.ShadingType.CLEAR},margins:{top:60,bottom:60,left:100,right:100},verticalAlign:D.VerticalAlign.CENTER,children:[new D.Paragraph({alignment:D.AlignmentType.CENTER,children:[tr(t,18,{bold:true})]})]});
+  const tc=(paras,span)=>new D.TableCell({borders:cellBorders,columnSpan:span,margins:{top:60,bottom:60,left:100,right:100},children:paras});
+  const p=(t,c)=>new D.Paragraph({alignment:c?D.AlignmentType.CENTER:D.AlignmentType.LEFT,spacing:{after:40},children:[tr(t,16)]});
+  return new D.Table({alignment:D.AlignmentType.CENTER,width:{size:FULL_W,type:D.WidthType.DXA},columnWidths:c4,rows:[
+    new D.TableRow({children:[hc('개인정보처리방침 안내 및 개인정보수집 동의서',3),hc('정보 주체 서명',1)]}),
+    new D.TableRow({children:[tc([p('○ 귀하는 개인정보제공을 거부할 수 있습니다. 단, 이 경우 수당을 지급하지 않게 됩니다.'),p('○ 제공된 개인정보는 소득세법에 따라 제공일자가 포함된 회계연도를 기준으로 5년간 보관되며, 관련법령에 따라 신고의 의무가 있거나, 적법한 요청이 있는 경우를 제외하고는 제3자에게 제공하지 않습니다.')],3),tc([p('')],1)]}),
+    new D.TableRow({children:[hc('[개인정보 처리]',2),hc('[고유식별정보의 처리]',2)]}),
+    new D.TableRow({children:[tc([p('본인은 개인정보처리방침에 동의하며, 수당 지급을 위하여 성명, 소속 및 직위, 주소, 은행 및 계좌정보 등의 개인정보를 제공하는 것에 동의합니다.')],2),tc([p('본인은 소득세법에 따른 소득신고를 위하여 본인의 고유식별번호(주민등록번호)를 제공하는 것에 동의합니다.')],2)]}),
+    new D.TableRow({children:[tc([p('□ 동의',1)],1),tc([p('□ 미동의',1)],1),tc([p('□ 동의',1)],1),tc([p('□ 미동의',1)],1)]}),
+  ]});
+}
+function buildDoc(rec){
+  const outerBox=new D.Table({alignment:D.AlignmentType.CENTER,width:{size:FULL_W,type:D.WidthType.DXA},columnWidths:[FULL_W],
+    rows:[new D.TableRow({children:[new D.TableCell({borders:cellBorders,width:{size:FULL_W,type:D.WidthType.DXA},margins:{top:160,bottom:200,left:280,right:280},children:bodyContent(rec)})]})]});
+  return new D.Document({
+    styles:{default:{document:{run:{font:'Malgun Gothic',size:22}}}},
+    sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1000,right:1000,bottom:1000,left:1000}}},
+      children:[outerBox,new D.Paragraph({spacing:{before:120,after:60},children:[tr('',2)]}),privacyTableDocx()]}]
+  });
+}
+function safeName(s){return String(s||'강사').replace(/[\\/:*?"<>|]/g,'_').trim();}
+
+async function downloadOne(rec){
+  if(!ensureDocx()){ alert('워드 생성 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.'); return; }
+  const blob=await D.Packer.toBlob(buildDoc(rec));
+  saveAs(blob,`강의확인서_${safeName(rec.강사명)}.docx`);
+}
+$('#cert-btnDownload').onclick=()=>{
+  if(!rows||rows.length===0){ alert('먼저 강사 명단 엑셀을 업로드해 주세요.'); return; }
+  downloadOne(rows[current]);
+};
+
+// 전체 일괄 저장 (순차 다운로드)
+$('#cert-btnBulk').onclick=async()=>{
+  const btn=$('#cert-btnBulk');btn.disabled=true;const orig=btn.textContent;
+  for(let i=0;i<rows.length;i++){
+    btn.textContent=`저장 중… (${i+1}/${rows.length})`;
+    await downloadOne(rows[i]);
+    await new Promise(r=>setTimeout(r,400)); // 브라우저 연속 다운로드 간격
+  }
+  btn.textContent=`✓ ${rows.length}건 저장 완료`;
+  setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},2500);
+};
+
+})();
+
+</script>
+</body>
+</html>
