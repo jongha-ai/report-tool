@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <style>
@@ -521,10 +522,10 @@
           <div style="font-size:15.5px;font-weight:800;color:var(--navy);letter-spacing:-.02em;">구글 시트에서 바로 불러오기</div>
         </div>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.55;">
-          다운로드 없이 구글 시트를 연동해 보고서를 만듭니다. 연번을 선택해 여러 건을 한 번에 생성할 수 있습니다.
+          다운로드 없이 구글 시트를 연동해 보고서를 만듭니다. 버튼을 누르면 시트를 선택할 수 있고, 사진까지 그대로 불러옵니다.
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <input type="text" id="sheetUrlInput" placeholder="구글 시트 링크 (비워두면 기본 시트)"
+          <input type="text" id="sheetUrlInput" placeholder="시트 링크 직접 입력 (비워두면 선택 창이 열립니다)"
             style="flex:1;min-width:240px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;font-size:13px;outline:none;" />
           <button id="btnLoadSheet" style="padding:11px 20px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--navy-2),var(--navy));color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;">
             시트 불러오기
@@ -734,10 +735,21 @@ async function processWorkbookBuffer(buf){
   btn.addEventListener('click', async ()=>{
     const statusEl=document.getElementById('sheetStatus');
     const show=(color,html)=>{statusEl.style.display='block';statusEl.style.color=color;statusEl.innerHTML=html;};
-    const sheetId=parseSheetId(document.getElementById('sheetUrlInput').value);
-    btn.disabled=true; const orig=btn.textContent; btn.innerHTML='<span class="spinner"></span> 불러오는 중…';
-    show('#5b6472','구글 로그인 및 시트를 읽는 중입니다…');
+    const urlInput=document.getElementById('sheetUrlInput').value.trim();
+    btn.disabled=true; const orig=btn.textContent;
     try{
+      let sheetId;
+      if(urlInput){
+        // 링크를 직접 입력한 경우: 그 ID로 시도
+        sheetId=parseSheetId(urlInput);
+      }else{
+        // 비어있으면 구글 피커로 시트 선택 (drive.file 권한으로 사진 포함 export 가능)
+        btn.innerHTML='<span class="spinner"></span> 시트 선택…';
+        show('#5b6472','구글에서 불러올 시트를 선택해 주세요…');
+        sheetId=await pickSpreadsheet();
+      }
+      btn.innerHTML='<span class="spinner"></span> 불러오는 중…';
+      show('#5b6472','시트를 읽는 중입니다 (사진 포함)…');
       const result=await fetchSheetAsXlsx(sheetId);
       $('#sbFileName').textContent='구글 시트 연동';
       if(result.type==='xlsx'){
@@ -745,21 +757,21 @@ async function processWorkbookBuffer(buf){
         await processWorkbookBuffer(result.data);
         show('#1a8a52','✓ 시트를 불러왔습니다 (사진 포함). 연번을 선택해 보고서를 만드세요.');
       }else{
-        // values: SheetJS 워크북으로 변환 (텍스트만, 사진 없음)
         $('#filechip-wrap').innerHTML=`<div class="filechip">🔗 구글 시트 연동 (텍스트)</div>`;
         const ws=XLSX.utils.aoa_to_sheet(result.data);
         const wb=XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb,ws,(result.title||'Sheet1').slice(0,31));
-        workbook=wb; sheetImages={};   // 사진 없음
+        workbook=wb; sheetImages={};
         buildSheetData(); buildSidebar(); goWork();
-        show('#b8860b','✓ 시트를 불러왔습니다. (사진은 이 방식으로 가져올 수 없어, 사진이 필요하면 엑셀 업로드를 이용해 주세요.)');
+        show('#b8860b','✓ 시트를 불러왔습니다. (사진이 안 보이면, 시트 선택 방식으로 다시 시도하거나 엑셀 업로드를 이용해 주세요.)');
       }
     }catch(err){
       const msg=String(err.message||err);
-      if(msg.includes(':403')) show('#c0392b','권한이 없습니다. 시트가 본인(로그인) 계정에 공유되어 있는지 확인해 주세요.');
-      else if(msg.includes(':404')) show('#c0392b','시트를 찾을 수 없습니다. 링크를 다시 확인해 주세요.');
-      else if(msg.includes(':400')) show('#c0392b','요청이 거부되었습니다. 로그인 권한 동의를 다시 진행하거나 잠시 후 다시 시도해 주세요.');
-      else if(msg==='google-not-loaded') show('#c0392b','구글 로그인 모듈이 아직 로드되지 않았습니다. 잠시 후 다시 시도해 주세요.');
+      if(msg==='picker-cancelled') show('#5b6472','시트 선택이 취소되었습니다.');
+      else if(msg.includes(':403')) show('#c0392b','권한이 없습니다. 시트가 본인(로그인) 계정의 것인지 확인해 주세요.');
+      else if(msg.includes(':404')) show('#c0392b','시트를 찾을 수 없습니다. 다시 선택해 주세요.');
+      else if(msg.includes(':400')) show('#c0392b','요청이 거부되었습니다. 로그인 권한 동의를 다시 진행해 주세요.');
+      else if(msg==='google-not-loaded'||msg==='gapi-not-loaded'||msg==='picker-load-failed') show('#c0392b','구글 모듈 로딩 중입니다. 잠시 후 다시 시도해 주세요.');
       else show('#c0392b','불러오기에 실패했습니다: '+msg.slice(0,120));
     }finally{
       btn.disabled=false; btn.textContent=orig;
@@ -1189,6 +1201,40 @@ const GOOGLE_CLIENT_ID = "1045439660755-2rnsi4snjhjun489riuqqtaom4jfsjko.apps.go
 const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/spreadsheets.readonly";
 // 시트 연동 기본값 (매니저 제공 시트). 다른 링크 입력 시 덮어씀.
 const DEFAULT_SHEET_ID = "1tEWFL5qNBoYEE97mlkh5bnnBCdYeF3ZU_wEI5EENwgo";
+const GOOGLE_PROJECT_NUMBER = "1045439660755"; // 피커 appId용 (프로젝트 번호)
+
+// ── 구글 피커 로드 ──
+let pickerApiLoaded=false;
+function loadPickerApi(){
+  return new Promise((resolve,reject)=>{
+    if(pickerApiLoaded)return resolve();
+    if(!window.gapi)return reject(new Error('gapi-not-loaded'));
+    gapi.load('picker',{callback:()=>{pickerApiLoaded=true;resolve();},onerror:()=>reject(new Error('picker-load-failed'))});
+  });
+}
+// 피커로 스프레드시트 1개 선택 → fileId 반환
+async function pickSpreadsheet(){
+  const token=await ensureToken();
+  await loadPickerApi();
+  return new Promise((resolve,reject)=>{
+    const view=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+      .setIncludeFolders(true).setSelectFolderEnabled(false).setOwnedByMe(true);
+    const picker=new google.picker.PickerBuilder()
+      .setAppId(GOOGLE_PROJECT_NUMBER)
+      .setOAuthToken(token)
+      .addView(view)
+      .addView(new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setEnableDrives(true)) // 공유 드라이브 포함
+      .setCallback((data)=>{
+        if(data.action===google.picker.Action.PICKED){
+          resolve(data.docs[0].id);
+        }else if(data.action===google.picker.Action.CANCEL){
+          reject(new Error('picker-cancelled'));
+        }
+      })
+      .build();
+    picker.setVisible(true);
+  });
+}
 
 let tokenClient=null, accessToken=null;
 
