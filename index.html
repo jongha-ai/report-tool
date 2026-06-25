@@ -1325,33 +1325,28 @@ function parseSheetId(input){
 // 2순위: Sheets API(텍스트만) — export가 막히면 폴백.
 async function fetchSheetAsXlsx(sheetId){
   const token=await ensureToken();
-  let exportErr='';
-  // 1순위: export 시도 (사진 포함 xlsx)
+  let err1='';
+  // 1순위: 원본 그대로 다운로드 (드라이브에 올린 .xlsx → 사진 포함)
+  try{
+    const url=`https://www.googleapis.com/drive/v3/files/${sheetId}?alt=media`;
+    const resp=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+    if(resp.ok){
+      const buf=await resp.arrayBuffer();
+      const head=new Uint8Array(buf.slice(0,2));
+      if(head[0]===0x50&&head[1]===0x4b)return {type:'xlsx', data:buf}; // 'PK' = xlsx(zip)
+      err1='원본이 xlsx 형식이 아님';
+    }else{
+      const t=await resp.text().catch(()=>'');
+      err1='media '+resp.status+': '+t.slice(0,150);
+    }
+  }catch(e){ err1='media 예외: '+(e.message||e); }
+  // 2순위: 진짜 구글 시트면 export로 변환 (사진 포함)
   try{
     const url=`https://www.googleapis.com/drive/v3/files/${sheetId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`;
     const resp=await fetch(url,{headers:{Authorization:'Bearer '+token}});
     if(resp.ok)return {type:'xlsx', data:await resp.arrayBuffer()};
     const t=await resp.text().catch(()=>'');
-    exportErr='export '+resp.status+': '+t.slice(0,150);
-  }catch(e){ exportErr='export 예외: '+(e.message||e); }
-  // 2순위: Sheets API로 값만 읽기 (텍스트)
-  try{
-    const metaUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets(properties(title))`;
-    const metaR=await fetch(metaUrl,{headers:{Authorization:'Bearer '+token}});
-    if(!metaR.ok){
-      const t=await metaR.text().catch(()=>'');
-      throw new Error('sheets-meta '+metaR.status+': '+t.slice(0,150)+' || (앞서 '+exportErr+')');
-    }
-    const meta=await metaR.json();
-    const firstTitle=(meta.sheets&&meta.sheets[0]&&meta.sheets[0].properties.title)||'Sheet1';
-    const valUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(firstTitle)}?majorDimension=ROWS`;
-    const valR=await fetch(valUrl,{headers:{Authorization:'Bearer '+token}});
-    if(!valR.ok){
-      const t=await valR.text().catch(()=>'');
-      throw new Error('sheets-values '+valR.status+': '+t.slice(0,150));
-    }
-    const val=await valR.json();
-    return {type:'values', data:val.values||[], title:firstTitle};
+    throw new Error('export '+resp.status+': '+t.slice(0,150)+' || (앞서 '+err1+')');
   }catch(e){
     throw new Error(String(e.message||e));
   }
