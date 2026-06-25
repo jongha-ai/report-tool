@@ -616,6 +616,15 @@
   <h4>구글 드라이브 저장 &amp; 메일 발송</h4>
   <div class="mh">버튼 한 번으로 드라이브에 보관하고 주무관에게 PDF를 첨부해 보냅니다.</div>
 
+  <div id="sendScopeBox" style="display:flex;flex-direction:column;gap:6px;margin:10px 0 14px;padding:11px 12px;background:var(--sky);border:1px solid var(--sky-line);border-radius:10px;">
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;">
+      <input type="radio" name="sendScope" value="current" checked style="accent-color:var(--blue);"> 지금 보고 있는 보고서 1건만 보내기
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;">
+      <input type="radio" name="sendScope" value="selected" style="accent-color:var(--blue);"> <span>왼쪽에서 <b id="sendSelCount">0</b>건 선택됨 — 한 메일에 모두 첨부해 보내기</span>
+    </label>
+  </div>
+
   <label class="fld">받는 사람 (주무관 이메일)</label>
   <input type="email" id="mTo" placeholder="report@gg.go.kr">
 
@@ -1126,6 +1135,8 @@ function updateBulkBar(){
   const btn=document.getElementById('btnBulkPdf');
   if(!btn)return;
   btn.textContent=`⤓ 선택한 ${n}건 저장`;
+  // 발송 모달의 선택 건수도 동기화
+  const sc=document.getElementById('sendSelCount'); if(sc)sc.textContent=n;
   if(n>0){
     btn.disabled=false; btn.style.cursor='pointer';
     btn.style.background='linear-gradient(135deg,var(--navy-2),var(--navy))'; btn.style.color='#fff';
@@ -1419,12 +1430,12 @@ async function uploadToDrive(blob, filename, folderId){
   return r.json(); // {id, webViewLink}
 }
 
-// ── Gmail: PDF 첨부 메일 발송 ──
-async function sendGmail(to, subject, bodyText, blob, filename){
-  const b64=await blobToBase64(blob);
+// ── Gmail: PDF 첨부 메일 발송 (첨부 1개 또는 여러 개) ──
+// attachments: [{blob, filename}, ...]  (단일 호출도 배열로 감싸 처리)
+async function sendGmailMulti(to, subject, bodyText, attachments){
   const enc=s=>'=?UTF-8?B?'+btoa(unescape(encodeURIComponent(s)))+'?=';
   const boundary='-------gm'+Date.now();
-  const mime=[
+  const parts=[
     'MIME-Version: 1.0',
     `To: ${to}`,
     `Subject: ${enc(subject)}`,
@@ -1435,22 +1446,32 @@ async function sendGmail(to, subject, bodyText, blob, filename){
     'Content-Transfer-Encoding: base64',
     '',
     btoa(unescape(encodeURIComponent(bodyText))),
-    '',
-    `--${boundary}`,
-    `Content-Type: application/pdf; name="${filename}"`,
-    'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="${filename}"`,
-    '',
-    b64,
-    '',
-    `--${boundary}--`
-  ].join('\r\n');
+    ''
+  ];
+  for(const att of attachments){
+    const b64=await blobToBase64(att.blob);
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: application/pdf; name="${att.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${att.filename}"`,
+      '',
+      b64,
+      ''
+    );
+  }
+  parts.push(`--${boundary}--`);
+  const mime=parts.join('\r\n');
   const raw=btoa(unescape(encodeURIComponent(mime))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
     method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
     body:JSON.stringify({raw})});
   if(!r.ok)throw new Error('gmail-send-failed');
   return r.json();
+}
+// 단일 첨부 호환 래퍼
+async function sendGmail(to, subject, bodyText, blob, filename){
+  return sendGmailMulti(to, subject, bodyText, [{blob, filename}]);
 }
 function blobToBase64(blob){
   return new Promise((res,rej)=>{
@@ -1495,19 +1516,57 @@ $('#btnSendAll').onclick=async()=>{
     return;
   }
 
+  const scope=(document.querySelector('input[name="sendScope"]:checked')||{}).value||'current';
+
   try{
     setBusy(true,'구글 로그인 확인 중…');
     await ensureToken();
 
+    const folderName=$('#mFolder').value.trim()||'생애전환교육 운영보고';
+
+    if(scope==='selected'){
+      // ── 선택한 여러 건: 각각 PDF 생성 → 드라이브 저장 → 한 메일에 모두 첨부 ──
+      const items=getCheckedItems();
+      if(items.length===0){ showStatus('err','왼쪽에서 보낼 회차를 먼저 체크해 주세요.'); setBusy(false); return; }
+
+      setBusy(true,`보고서 ${items.length}건 생성 중…`);
+      const folderId=await ensureFolder(folderName);
+      const attachments=[];
+      let savedLinks='';
+      for(let k=0;k<items.length;k++){
+        const {name,i}=items[k];
+        showStatus('info',`<div class="stp"><span class="spinner" style="border-top-color:var(--blue)"></span>보고서 생성·저장 중… ${k+1}/${items.length}</div>`);
+        selectRow(name,i);
+        await new Promise(r=>setTimeout(r,350));
+        const blob=await buildPdfBlob();
+        const rec=sheetData[name][i];
+        const d=fmtDate(rec.date).replace(/\s/g,'');
+        const fname=`${String(k+1).padStart(2,'0')}_${d}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,24)}.pdf`;
+        attachments.push({blob, filename:fname});
+        try{ const up=await uploadToDrive(blob,fname,folderId); if(up.webViewLink&&!savedLinks)savedLinks=up.webViewLink; }catch(e){}
+      }
+      setBusy(true,'메일 발송 중…');
+      showStatus('info',`<div class="stp"><span class="mk">✓</span>${items.length}건 생성·저장 완료</div><div class="stp"><span class="mk">⏳</span>${items.length}개 첨부 메일 발송 중…</div>`);
+      const subj=$('#mSubj').value;
+      const body=$('#mBody').value;
+      await sendGmailMulti(to, subj, body, attachments);
+      showStatus('ok',
+        `<div class="stp"><span class="mk">✓</span><b>완료되었습니다.</b></div>`+
+        `<div class="stp"><span class="mk">·</span>드라이브 폴더에 ${items.length}건 보관됨${savedLinks?` (<a href="${savedLinks}" target="_blank" style="color:#136b41;text-decoration:underline">폴더 열기</a>)`:''}</div>`+
+        `<div class="stp"><span class="mk">·</span>${esc(to)} 으로 ${items.length}개 PDF 첨부 메일 발송됨</div>`);
+      setBusy(false,'다시 보내기');
+      return;
+    }
+
+    // ── 현재 1건 ──
     setBusy(true,'보고서 PDF 생성 중…');
     showStatus('info',`<div class="stp"><span class="spinner" style="border-top-color:var(--blue)"></span>PDF를 만들고 있습니다…</div>`);
     const blob=await buildPdfBlob();
     const fname=pdfFileName();
 
     setBusy(true,'드라이브에 저장 중…');
-    showStatus('info',
-      `<div class="stp"><span class="mk">⏳</span>드라이브에 저장 중…</div>`);
-    const folderId=await ensureFolder($('#mFolder').value.trim()||'생애전환교육 운영보고');
+    showStatus('info',`<div class="stp"><span class="mk">⏳</span>드라이브에 저장 중…</div>`);
+    const folderId=await ensureFolder(folderName);
     const up=await uploadToDrive(blob,fname,folderId);
 
     setBusy(true,'메일 발송 중…');
@@ -1522,7 +1581,6 @@ $('#btnSendAll').onclick=async()=>{
       `<div class="stp"><span class="mk">·</span>${esc(to)} 으로 PDF 첨부 메일 발송됨</div>`);
     setBusy(false,'다시 보내기');
   }catch(err){
-    // 실패 시 안전하게 폴백
     showStatus('err',`자동 발송 중 문제가 생겨, 수동 방식으로 전환합니다. (${esc(String(err.message||err))})`);
     await fallbackFlow('error');
   }
