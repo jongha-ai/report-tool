@@ -582,6 +582,7 @@
         선택 0건 PDF
       </button>
     </div>
+    <div id="bulkStatus" style="display:none;font-size:12px;margin:-4px 2px 12px;line-height:1.5;"></div>
 
     <div id="sheetGroups"></div>
 
@@ -1145,54 +1146,54 @@ function updateBulkBar(){
 
 async function bulkDownloadPdf(){
   const items=getCheckedItems();
-  if(items.length===0)return;
+  const diag=(html,color)=>{ const se=document.getElementById('bulkStatus'); if(se){se.style.display='block';se.style.color=color||'#1E2761';se.innerHTML=html;} };
+  diag('선택된 항목: <b>'+items.length+'</b>건 — 처리를 시작합니다.');
+  if(items.length===0){ diag('체크된 항목이 없습니다. 회차 왼쪽 체크박스를 선택해 주세요.','#c0392b'); return; }
   const btn=document.getElementById('btnBulkPdf');
   const orig=btn.textContent; btn.disabled=true;
   try{
     if(items.length===1){
-      // 1건이면 PDF 단일 다운로드
       const {name,i}=items[0];
       btn.innerHTML=`<span class="spinner"></span> 생성 중…`;
       selectRow(name,i);
-      await new Promise(r=>setTimeout(r,250));
+      await new Promise(r=>setTimeout(r,300));
       const blob=await buildPdfBlob();
       const rec=sheetData[name][i];
       const d=fmtDate(rec.date).replace(/\s/g,'');
       const fname=`${d}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,30)}.pdf`;
       triggerDownload(blob,fname);
+      diag('✓ 1건 PDF 다운로드 완료.');
     }else{
-      // 여러 건이면 ZIP 하나로 묶어 다운로드 (브라우저 연속 다운로드 차단 회피)
       const JSZ=await loadJSZip();
       const zip=new JSZ();
+      let added=0;
       for(let k=0;k<items.length;k++){
         const {name,i}=items[k];
         btn.innerHTML=`<span class="spinner"></span> ${k+1}/${items.length} 생성 중…`;
+        diag(`보고서 생성 중… <b>${k+1}/${items.length}</b>`);
         selectRow(name,i);
-        await new Promise(r=>setTimeout(r,250));
+        await new Promise(r=>setTimeout(r,350));   // 렌더 안정화
         const blob=await buildPdfBlob();
         const rec=sheetData[name][i];
         const d=fmtDate(rec.date).replace(/\s/g,'');
-        let fname=`${d}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,30)}.pdf`;
-        // 동일 파일명 충돌 방지
-        if(zip.file(fname))fname=`${d}_${k+1}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,24)}.pdf`;
+        let fname=`${String(k+1).padStart(2,'0')}_${d}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,24)}.pdf`;
         zip.file(fname, blob);
+        added++;
       }
       btn.innerHTML=`<span class="spinner"></span> 압축 중…`;
+      diag(`압축 중… (담긴 보고서 <b>${added}</b>건)`);
       const zipBlob=await zip.generateAsync({type:'blob'});
       const today=new Date();
       const stamp=`${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
-      triggerDownload(zipBlob,`교육운영보고서_${items.length}건_${stamp}.zip`);
+      triggerDownload(zipBlob,`교육운영보고서_${added}건_${stamp}.zip`);
+      diag(`✓ <b>${added}건</b>을 ZIP 파일 하나로 다운로드했습니다. (압축을 풀면 ${added}개의 PDF가 들어 있습니다.)`);
     }
     btn.innerHTML=`✓ ${items.length}건 완료`;
     setTimeout(()=>{btn.textContent=orig;btn.disabled=false;updateBulkBar();},1500);
   }catch(err){
     btn.textContent='다운로드 실패';
     console.error(err);
-    // 진단 메시지를 시트 상태 영역(있으면)이나 alert로 표시
-    const msg='일괄 다운로드 오류: '+String(err&&err.message||err).slice(0,200);
-    const se=document.getElementById('sheetStatus');
-    if(se){se.style.display='block';se.style.color='#c0392b';se.textContent=msg;}
-    else alert(msg);
+    diag('일괄 다운로드 오류: '+String(err&&err.message||err).slice(0,200),'#c0392b');
     setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},1800);
   }
 }
