@@ -1357,7 +1357,9 @@ function ensureToken(){
       if(resp.error)return reject(new Error(resp.error));
       accessToken=resp.access_token; resolve(accessToken);
     };
-    tokenClient.requestAccessToken({prompt: accessToken?'':'consent'});
+    // prompt:'' = 이미 동의한 권한이면 화면 없이 조용히 토큰 발급(재동의 강요 안 함).
+    // 한 번도 동의 안 했거나 권한이 부족하면 구글이 알아서 동의 화면을 띄움.
+    tokenClient.requestAccessToken({prompt: ''});
   });
 }
 
