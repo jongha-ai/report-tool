@@ -514,7 +514,28 @@
       </div>
     </section>
 
+    <section class="upload-card" style="margin-bottom:16px;">
+      <div style="border:1.5px solid var(--sky-line);border-radius:16px;padding:20px 22px;background:var(--sky);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <span style="font-size:20px;">🔗</span>
+          <div style="font-size:15.5px;font-weight:800;color:var(--navy);letter-spacing:-.02em;">구글 시트에서 바로 불러오기</div>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.55;">
+          다운로드 없이 구글 시트를 연동해 보고서를 만듭니다. 연번을 선택해 여러 건을 한 번에 생성할 수 있습니다.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="sheetUrlInput" placeholder="구글 시트 링크 (비워두면 기본 시트)"
+            style="flex:1;min-width:240px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;font-size:13px;outline:none;" />
+          <button id="btnLoadSheet" style="padding:11px 20px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--navy-2),var(--navy));color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            시트 불러오기
+          </button>
+        </div>
+        <div id="sheetStatus" style="font-size:12px;margin-top:10px;display:none;"></div>
+      </div>
+    </section>
+
     <section class="upload-card">
+      <div style="text-align:center;font-size:12px;color:var(--faint);margin-bottom:10px;">또는 엑셀 파일 직접 업로드</div>
       <div class="drop" id="drop">
         <div class="ic">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 01-.8-7.92A5.5 5.5 0 0117.6 9.2 3.5 3.5 0 0117 18h-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 12v7M9 15l3-3 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -550,6 +571,16 @@
       <div class="cnt" id="sbTotal">0</div>
     </div>
     <div class="sb-sub">미리볼 회차를 선택하세요.</div>
+
+    <div id="bulkBar" style="display:flex;align-items:center;gap:8px;padding:10px 12px;margin-bottom:12px;border:1px solid var(--sky-line);border-radius:11px;background:var(--sky);">
+      <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--navy);cursor:pointer;">
+        <input type="checkbox" id="checkAll" style="width:16px;height:16px;accent-color:var(--blue);cursor:pointer;" />
+        전체 선택
+      </label>
+      <button id="btnBulkPdf" disabled style="margin-left:auto;padding:8px 14px;border:none;border-radius:9px;background:var(--gray);color:var(--faint);font-size:12.5px;font-weight:700;cursor:not-allowed;white-space:nowrap;">
+        선택 0건 PDF
+      </button>
+    </div>
 
     <div id="sheetGroups"></div>
 
@@ -684,12 +715,57 @@ async function handleFile(file){
   $('#filechip-wrap').innerHTML=`<div class="filechip">📎 ${file.name}</div>`;
   $('#sbFileName').textContent=file.name;
   const buf=await file.arrayBuffer();
+  await processWorkbookBuffer(buf);
+}
+
+// 엑셀/시트 공통: ArrayBuffer를 받아 보고서 데이터로 처리
+async function processWorkbookBuffer(buf){
   workbook=XLSX.read(buf,{type:'array'});
   await extractImages(buf);
   buildSheetData();
   buildSidebar();
   goWork();
 }
+
+// ── 구글 시트 연동: 불러오기 버튼 ──
+(function(){
+  const btn=document.getElementById('btnLoadSheet');
+  if(!btn)return;
+  btn.addEventListener('click', async ()=>{
+    const statusEl=document.getElementById('sheetStatus');
+    const show=(color,html)=>{statusEl.style.display='block';statusEl.style.color=color;statusEl.innerHTML=html;};
+    const sheetId=parseSheetId(document.getElementById('sheetUrlInput').value);
+    btn.disabled=true; const orig=btn.textContent; btn.innerHTML='<span class="spinner"></span> 불러오는 중…';
+    show('#5b6472','구글 로그인 및 시트를 읽는 중입니다…');
+    try{
+      const result=await fetchSheetAsXlsx(sheetId);
+      $('#sbFileName').textContent='구글 시트 연동';
+      if(result.type==='xlsx'){
+        $('#filechip-wrap').innerHTML=`<div class="filechip">🔗 구글 시트 연동 (사진 포함)</div>`;
+        await processWorkbookBuffer(result.data);
+        show('#1a8a52','✓ 시트를 불러왔습니다 (사진 포함). 연번을 선택해 보고서를 만드세요.');
+      }else{
+        // values: SheetJS 워크북으로 변환 (텍스트만, 사진 없음)
+        $('#filechip-wrap').innerHTML=`<div class="filechip">🔗 구글 시트 연동 (텍스트)</div>`;
+        const ws=XLSX.utils.aoa_to_sheet(result.data);
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,ws,(result.title||'Sheet1').slice(0,31));
+        workbook=wb; sheetImages={};   // 사진 없음
+        buildSheetData(); buildSidebar(); goWork();
+        show('#b8860b','✓ 시트를 불러왔습니다. (사진은 이 방식으로 가져올 수 없어, 사진이 필요하면 엑셀 업로드를 이용해 주세요.)');
+      }
+    }catch(err){
+      const msg=String(err.message||err);
+      if(msg.includes(':403')) show('#c0392b','권한이 없습니다. 시트가 본인(로그인) 계정에 공유되어 있는지 확인해 주세요.');
+      else if(msg.includes(':404')) show('#c0392b','시트를 찾을 수 없습니다. 링크를 다시 확인해 주세요.');
+      else if(msg.includes(':400')) show('#c0392b','요청이 거부되었습니다. 로그인 권한 동의를 다시 진행하거나 잠시 후 다시 시도해 주세요.');
+      else if(msg==='google-not-loaded') show('#c0392b','구글 로그인 모듈이 아직 로드되지 않았습니다. 잠시 후 다시 시도해 주세요.');
+      else show('#c0392b','불러오기에 실패했습니다: '+msg.slice(0,120));
+    }finally{
+      btn.disabled=false; btn.textContent=orig;
+    }
+  });
+})();
 
 // ── 화면 전환 ──
 function goWork(){
@@ -916,6 +992,7 @@ function buildSidebar(){
       item.className='sb-item';
       item.dataset.name=name; item.dataset.i=i;
       item.innerHTML=`
+        <input type="checkbox" class="sb-check" data-name="${esc(name)}" data-i="${i}" style="width:17px;height:17px;flex:none;cursor:pointer;accent-color:var(--blue);" />
         <div class="seq">${seq}</div>
         <div class="meta">
           <div class="c">${esc(rec.course||'(과정명 없음)')}</div>
@@ -923,6 +1000,8 @@ function buildSidebar(){
         </div>
         <span class="ph ${pc===0?'zero':''}">사진 ${pc}</span>
         <span class="arr">›</span>`;
+      // 체크박스 클릭은 미리보기 전환과 분리
+      item.querySelector('.sb-check').addEventListener('click',e=>{e.stopPropagation();updateBulkBar();});
       item.onclick=()=>selectRow(name,i);
       group.appendChild(item);
 
@@ -1015,6 +1094,69 @@ function doPrint(){
 }
 $('#btnPrint').onclick=doPrint;
 
+// ── 여러 건 선택 → 일괄 PDF 다운로드 ──
+function getCheckedItems(){
+  return Array.from(document.querySelectorAll('.sb-check:checked'))
+    .map(cb=>({name:cb.dataset.name, i:parseInt(cb.dataset.i,10)}));
+}
+function updateBulkBar(){
+  const n=getCheckedItems().length;
+  const btn=document.getElementById('btnBulkPdf');
+  if(!btn)return;
+  btn.textContent=`선택 ${n}건 PDF`;
+  if(n>0){
+    btn.disabled=false; btn.style.cursor='pointer';
+    btn.style.background='linear-gradient(135deg,var(--navy-2),var(--navy))'; btn.style.color='#fff';
+  }else{
+    btn.disabled=true; btn.style.cursor='not-allowed';
+    btn.style.background='var(--gray)'; btn.style.color='var(--faint)';
+  }
+  // 전체선택 체크박스 동기화
+  const all=document.querySelectorAll('.sb-check');
+  const allChecked=all.length>0 && getCheckedItems().length===all.length;
+  const ca=document.getElementById('checkAll'); if(ca)ca.checked=allChecked;
+}
+(function(){
+  const ca=document.getElementById('checkAll');
+  if(ca)ca.addEventListener('change',()=>{
+    document.querySelectorAll('.sb-check').forEach(cb=>cb.checked=ca.checked);
+    updateBulkBar();
+  });
+  const bb=document.getElementById('btnBulkPdf');
+  if(bb)bb.addEventListener('click',bulkDownloadPdf);
+})();
+
+async function bulkDownloadPdf(){
+  const items=getCheckedItems();
+  if(items.length===0)return;
+  const btn=document.getElementById('btnBulkPdf');
+  const orig=btn.textContent; btn.disabled=true;
+  const { jsPDF }=window.jspdf;
+  try{
+    for(let k=0;k<items.length;k++){
+      const {name,i}=items[k];
+      btn.innerHTML=`<span class="spinner"></span> ${k+1}/${items.length} 생성 중…`;
+      selectRow(name,i);                         // 해당 행 렌더
+      await new Promise(r=>setTimeout(r,250));    // 렌더 안정화 대기
+      const blob=await buildPdfBlob();            // 기존 단건 PDF 생성 재활용
+      const rec=sheetData[name][i];
+      const d=fmtDate(rec.date).replace(/\s/g,'');
+      const fname=`${d}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,30)}.pdf`;
+      // 브라우저 다운로드
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+      await new Promise(r=>setTimeout(r,400));    // 연속 다운로드 간격
+    }
+    btn.innerHTML=`✓ ${items.length}건 완료`;
+    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;updateBulkBar();},1500);
+  }catch(err){
+    btn.textContent='다운로드 실패';
+    console.error(err);
+    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},1500);
+  }
+}
+
 // ── 메일 본문 자동 작성 ──
 function prepMail(rec){
   const dateShort=fmtDate(rec.date);
@@ -1044,7 +1186,9 @@ $('#btnMail').onclick=()=>{mailOpen=!mailOpen;$('#mailCard').classList.toggle('h
    (구글 클라우드 콘솔 > 사용자 인증 정보 > OAuth 클라이언트 ID)
    ════════════════════════════════════════════════════════ */
 const GOOGLE_CLIENT_ID = "1045439660755-2rnsi4snjhjun489riuqqtaom4jfsjko.apps.googleusercontent.com"; // 예: "1234567890-abcde.apps.googleusercontent.com"
-const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send";
+const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/spreadsheets.readonly";
+// 시트 연동 기본값 (매니저 제공 시트). 다른 링크 입력 시 덮어씀.
+const DEFAULT_SHEET_ID = "1tEWFL5qNBoYEE97mlkh5bnnBCdYeF3ZU_wEI5EENwgo";
 
 let tokenClient=null, accessToken=null;
 
@@ -1118,6 +1262,47 @@ function ensureToken(){
     };
     tokenClient.requestAccessToken({prompt: accessToken?'':'consent'});
   });
+}
+
+// ── 구글 시트를 xlsx로 자동 export해서 받기 (다운로드 없이, 사진 포함) ──
+// 드라이브 export 엔드포인트는 셀 삽입 이미지까지 포함한 xlsx를 반환한다.
+function parseSheetId(input){
+  const s=String(input||'').trim();
+  if(!s)return DEFAULT_SHEET_ID;
+  const m=s.match(/\/d\/([a-zA-Z0-9_-]+)/);   // 전체 URL이면 ID 추출
+  if(m)return m[1];
+  if(/^[a-zA-Z0-9_-]{20,}$/.test(s))return s; // ID만 붙여넣은 경우
+  return DEFAULT_SHEET_ID;
+}
+// 시트를 읽어 도구가 쓰는 형식으로 변환.
+// 1순위: 드라이브 export(xlsx, 사진 포함) — drive 권한이 허용된 경우.
+// 2순위: Sheets API(텍스트만) — export가 막히면 폴백.
+async function fetchSheetAsXlsx(sheetId){
+  const token=await ensureToken();
+  // 1순위: export 시도 (사진 포함 xlsx)
+  try{
+    const url=`https://www.googleapis.com/drive/v3/files/${sheetId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`;
+    const resp=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+    if(resp.ok)return {type:'xlsx', data:await resp.arrayBuffer()};
+    // 403/404면 폴백으로
+  }catch(e){/* 폴백 */}
+  // 2순위: Sheets API로 값만 읽기 (텍스트, 사진 없음)
+  const metaUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets(properties(title))`;
+  const metaR=await fetch(metaUrl,{headers:{Authorization:'Bearer '+token}});
+  if(!metaR.ok){
+    const t=await metaR.text().catch(()=>'');
+    throw new Error('sheets-failed:'+metaR.status+':'+t.slice(0,200));
+  }
+  const meta=await metaR.json();
+  const firstTitle=(meta.sheets&&meta.sheets[0]&&meta.sheets[0].properties.title)||'Sheet1';
+  const valUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(firstTitle)}?majorDimension=ROWS`;
+  const valR=await fetch(valUrl,{headers:{Authorization:'Bearer '+token}});
+  if(!valR.ok){
+    const t=await valR.text().catch(()=>'');
+    throw new Error('sheets-failed:'+valR.status+':'+t.slice(0,200));
+  }
+  const val=await valR.json();
+  return {type:'values', data:val.values||[], title:firstTitle};
 }
 
 // ── 드라이브: 폴더 찾기/만들기 ──
