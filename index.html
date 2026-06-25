@@ -1143,30 +1143,55 @@ async function bulkDownloadPdf(){
   if(items.length===0)return;
   const btn=document.getElementById('btnBulkPdf');
   const orig=btn.textContent; btn.disabled=true;
-  const { jsPDF }=window.jspdf;
   try{
-    for(let k=0;k<items.length;k++){
-      const {name,i}=items[k];
-      btn.innerHTML=`<span class="spinner"></span> ${k+1}/${items.length} 생성 중…`;
-      selectRow(name,i);                         // 해당 행 렌더
-      await new Promise(r=>setTimeout(r,250));    // 렌더 안정화 대기
-      const blob=await buildPdfBlob();            // 기존 단건 PDF 생성 재활용
+    if(items.length===1){
+      // 1건이면 PDF 단일 다운로드
+      const {name,i}=items[0];
+      btn.innerHTML=`<span class="spinner"></span> 생성 중…`;
+      selectRow(name,i);
+      await new Promise(r=>setTimeout(r,250));
+      const blob=await buildPdfBlob();
       const rec=sheetData[name][i];
       const d=fmtDate(rec.date).replace(/\s/g,'');
       const fname=`${d}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,30)}.pdf`;
-      // 브라우저 다운로드
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click();
-      a.remove(); URL.revokeObjectURL(url);
-      await new Promise(r=>setTimeout(r,400));    // 연속 다운로드 간격
+      triggerDownload(blob,fname);
+    }else{
+      // 여러 건이면 ZIP 하나로 묶어 다운로드 (브라우저 연속 다운로드 차단 회피)
+      const JSZ=await loadJSZip();
+      const zip=new JSZ();
+      for(let k=0;k<items.length;k++){
+        const {name,i}=items[k];
+        btn.innerHTML=`<span class="spinner"></span> ${k+1}/${items.length} 생성 중…`;
+        selectRow(name,i);
+        await new Promise(r=>setTimeout(r,250));
+        const blob=await buildPdfBlob();
+        const rec=sheetData[name][i];
+        const d=fmtDate(rec.date).replace(/\s/g,'');
+        let fname=`${d}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,30)}.pdf`;
+        // 동일 파일명 충돌 방지
+        if(zip.file(fname))fname=`${d}_${k+1}_${(rec.course||'보고서').replace(/[\\/:*?"<>|]/g,'').slice(0,24)}.pdf`;
+        zip.file(fname, blob);
+      }
+      btn.innerHTML=`<span class="spinner"></span> 압축 중…`;
+      const zipBlob=await zip.generateAsync({type:'blob'});
+      const today=new Date();
+      const stamp=`${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+      triggerDownload(zipBlob,`교육운영보고서_${items.length}건_${stamp}.zip`);
     }
     btn.innerHTML=`✓ ${items.length}건 완료`;
     setTimeout(()=>{btn.textContent=orig;btn.disabled=false;updateBulkBar();},1500);
   }catch(err){
     btn.textContent='다운로드 실패';
     console.error(err);
-    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},1500);
+    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},1800);
   }
+}
+// 다운로드 트리거 (revoke를 지연시켜 중간 취소 방지)
+function triggerDownload(blob,fname){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
 
 // ── 메일 본문 자동 작성 ──
