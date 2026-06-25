@@ -768,11 +768,11 @@ async function processWorkbookBuffer(buf){
     }catch(err){
       const msg=String(err.message||err);
       if(msg==='picker-cancelled') show('#5b6472','시트 선택이 취소되었습니다.');
-      else if(msg.includes(':403')) show('#c0392b','권한이 없습니다. 시트가 본인(로그인) 계정의 것인지 확인해 주세요.');
-      else if(msg.includes(':404')) show('#c0392b','시트를 찾을 수 없습니다. 다시 선택해 주세요.');
-      else if(msg.includes(':400')) show('#c0392b','요청이 거부되었습니다. 로그인 권한 동의를 다시 진행해 주세요.');
       else if(msg==='google-not-loaded'||msg==='gapi-not-loaded'||msg==='picker-load-failed') show('#c0392b','구글 모듈 로딩 중입니다. 잠시 후 다시 시도해 주세요.');
-      else show('#c0392b','불러오기에 실패했습니다: '+msg.slice(0,120));
+      else {
+        // 진단용: 원본 에러 메시지를 그대로 노출
+        show('#c0392b','<b>오류 상세(진단용):</b><br><span style="font-family:monospace;font-size:11px;word-break:break-all;">'+msg.replace(/</g,'&lt;').slice(0,400)+'</span>');
+      }
     }finally{
       btn.disabled=false; btn.textContent=orig;
     }
@@ -1325,30 +1325,36 @@ function parseSheetId(input){
 // 2순위: Sheets API(텍스트만) — export가 막히면 폴백.
 async function fetchSheetAsXlsx(sheetId){
   const token=await ensureToken();
+  let exportErr='';
   // 1순위: export 시도 (사진 포함 xlsx)
   try{
     const url=`https://www.googleapis.com/drive/v3/files/${sheetId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`;
     const resp=await fetch(url,{headers:{Authorization:'Bearer '+token}});
     if(resp.ok)return {type:'xlsx', data:await resp.arrayBuffer()};
-    // 403/404면 폴백으로
-  }catch(e){/* 폴백 */}
-  // 2순위: Sheets API로 값만 읽기 (텍스트, 사진 없음)
-  const metaUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets(properties(title))`;
-  const metaR=await fetch(metaUrl,{headers:{Authorization:'Bearer '+token}});
-  if(!metaR.ok){
-    const t=await metaR.text().catch(()=>'');
-    throw new Error('sheets-failed:'+metaR.status+':'+t.slice(0,200));
+    const t=await resp.text().catch(()=>'');
+    exportErr='export '+resp.status+': '+t.slice(0,150);
+  }catch(e){ exportErr='export 예외: '+(e.message||e); }
+  // 2순위: Sheets API로 값만 읽기 (텍스트)
+  try{
+    const metaUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets(properties(title))`;
+    const metaR=await fetch(metaUrl,{headers:{Authorization:'Bearer '+token}});
+    if(!metaR.ok){
+      const t=await metaR.text().catch(()=>'');
+      throw new Error('sheets-meta '+metaR.status+': '+t.slice(0,150)+' || (앞서 '+exportErr+')');
+    }
+    const meta=await metaR.json();
+    const firstTitle=(meta.sheets&&meta.sheets[0]&&meta.sheets[0].properties.title)||'Sheet1';
+    const valUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(firstTitle)}?majorDimension=ROWS`;
+    const valR=await fetch(valUrl,{headers:{Authorization:'Bearer '+token}});
+    if(!valR.ok){
+      const t=await valR.text().catch(()=>'');
+      throw new Error('sheets-values '+valR.status+': '+t.slice(0,150));
+    }
+    const val=await valR.json();
+    return {type:'values', data:val.values||[], title:firstTitle};
+  }catch(e){
+    throw new Error(String(e.message||e));
   }
-  const meta=await metaR.json();
-  const firstTitle=(meta.sheets&&meta.sheets[0]&&meta.sheets[0].properties.title)||'Sheet1';
-  const valUrl=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(firstTitle)}?majorDimension=ROWS`;
-  const valR=await fetch(valUrl,{headers:{Authorization:'Bearer '+token}});
-  if(!valR.ok){
-    const t=await valR.text().catch(()=>'');
-    throw new Error('sheets-failed:'+valR.status+':'+t.slice(0,200));
-  }
-  const val=await valR.json();
-  return {type:'values', data:val.values||[], title:firstTitle};
 }
 
 // ── 드라이브: 폴더 찾기/만들기 ──
