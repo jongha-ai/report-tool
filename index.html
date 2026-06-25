@@ -702,6 +702,7 @@
 <script>
 const $=s=>document.querySelector(s);
 let workbook=null, sheetData={}, sheetImages={}, sheetCols={}, current=null;
+let flatRecs=[]; // 사이드바 항목의 전역 인덱스 → {name,i} 매핑 (체크박스 안전 참조용)
 
 // ── 파일 업로드 핸들링 ──
 const drop=$('#drop'), fileInput=$('#file');
@@ -983,6 +984,7 @@ function loadJSZip(){
 // ── 사이드바(캠퍼스별 회차 목록) ──
 function buildSidebar(){
   const host=$('#sheetGroups'); host.innerHTML='';
+  flatRecs=[]; // 전역 인덱스 매핑 초기화
   // 숨김 셀렉트도 동기화(기존 로직 호환)
   const sel=$('#sheetSel'); sel.innerHTML='';
   let total=0, firstName=null, firstIdx=0, picked=false;
@@ -999,12 +1001,14 @@ function buildSidebar(){
     recs.forEach((rec,i)=>{
       let pc=0;const pcols=sheetCols[name]?.photoAbsCols||[];
       pcols.forEach(c=>{if(sheetImages[name]&&sheetImages[name][rec.excelRow+'_'+c])pc++;});
+      const gidx=flatRecs.length;        // 전역 인덱스
+      flatRecs.push({name,i});           // 매핑 등록
       const seq=String(i+1).padStart(2,'0');
       const item=document.createElement('div');
       item.className='sb-item';
       item.dataset.name=name; item.dataset.i=i;
       item.innerHTML=`
-        <input type="checkbox" class="sb-check" data-name="${esc(name)}" data-i="${i}" style="width:17px;height:17px;flex:none;cursor:pointer;accent-color:var(--blue);" />
+        <input type="checkbox" class="sb-check" data-gidx="${gidx}" style="width:17px;height:17px;flex:none;cursor:pointer;accent-color:var(--blue);" />
         <div class="seq">${seq}</div>
         <div class="meta">
           <div class="c">${esc(rec.course||'(과정명 없음)')}</div>
@@ -1109,7 +1113,8 @@ $('#btnPrint').onclick=doPrint;
 // ── 여러 건 선택 → 일괄 PDF 다운로드 ──
 function getCheckedItems(){
   return Array.from(document.querySelectorAll('.sb-check:checked'))
-    .map(cb=>({name:cb.dataset.name, i:parseInt(cb.dataset.i,10)}));
+    .map(cb=>flatRecs[parseInt(cb.dataset.gidx,10)])
+    .filter(Boolean);
 }
 function updateBulkBar(){
   const n=getCheckedItems().length;
@@ -1183,6 +1188,11 @@ async function bulkDownloadPdf(){
   }catch(err){
     btn.textContent='다운로드 실패';
     console.error(err);
+    // 진단 메시지를 시트 상태 영역(있으면)이나 alert로 표시
+    const msg='일괄 다운로드 오류: '+String(err&&err.message||err).slice(0,200);
+    const se=document.getElementById('sheetStatus');
+    if(se){se.style.display='block';se.style.color='#c0392b';se.textContent=msg;}
+    else alert(msg);
     setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},1800);
   }
 }
