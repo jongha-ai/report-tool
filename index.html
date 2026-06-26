@@ -1268,13 +1268,24 @@ async function pickSpreadsheet(){
   const token=await ensureToken();
   await loadPickerApi();
   return new Promise((resolve,reject)=>{
-    const view=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
-      .setIncludeFolders(true).setSelectFolderEnabled(false).setOwnedByMe(true);
+    // ① 내 드라이브 (내가 소유 + 공유받은 파일 모두)
+    const myView=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+      .setIncludeFolders(true).setSelectFolderEnabled(false);
+    // ② 공유 드라이브(팀 드라이브)
+    const sharedDrivesView=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+      .setIncludeFolders(true).setSelectFolderEnabled(false)
+      .setEnableDrives(true);
+    // ③ 나와 공유된 항목 (Shared with me)
+    const sharedWithMeView=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+      .setIncludeFolders(true).setSelectFolderEnabled(false)
+      .setOwnedByMe(false);
     const picker=new google.picker.PickerBuilder()
       .setAppId(GOOGLE_PROJECT_NUMBER)
       .setOAuthToken(token)
-      .addView(view)
-      .addView(new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setEnableDrives(true)) // 공유 드라이브 포함
+      .enableFeature(google.picker.Feature.SUPPORT_DRIVES) // 공유 드라이브 지원 켜기
+      .addView(myView)
+      .addView(sharedDrivesView)
+      .addView(sharedWithMeView)
       .setCallback((data)=>{
         if(data.action===google.picker.Action.PICKED){
           resolve(data.docs[0].id);
