@@ -961,11 +961,14 @@ async function extractImages(buf){
       const dr=parser.parseFromString(await drawRelsObj.async('string'),'application/xml');
       dr.querySelectorAll('Relationship').forEach(n=>drawRelMap[n.getAttribute('Id')]=n.getAttribute('Target'));
     }
-    // 각 앵커(anchor)에서 from row/col + 이미지 rId 추출
+    // 각 앵커(anchor)에서 from row/col + offset + 이미지 rId 추출
     const anchors=[...drawXml.querySelectorAll('twoCellAnchor, oneCellAnchor')];
+    const list=[];
     for(const an of anchors){
       const fromRow=parseInt(an.querySelector('from > row')?.textContent ?? '-1');
       const fromCol=parseInt(an.querySelector('from > col')?.textContent ?? '-1');
+      const rowOff=parseInt(an.querySelector('from > rowOff')?.textContent ?? '0');
+      const colOff=parseInt(an.querySelector('from > colOff')?.textContent ?? '0');
       const blip=an.querySelector('blip');
       if(!blip)continue;
       const embed=blip.getAttribute('r:embed')||blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','embed');
@@ -980,15 +983,26 @@ async function extractImages(buf){
       const rawData=`data:${mime};base64,${b64}`;
       // ★자동 압축: 큰 사진을 가로 max 1600px, JPEG 0.8로 줄여 용량 절감
       const data=await compressImage(rawData);
-      // ★행 단위로 모든 사진 보존 (같은 칸 겹쳐도 덮어쓰지 않고 배열에 추가)
-      const rk=String(fromRow+1);               // 1-based row 키
-      if(!sheetImages[name][rk])sheetImages[name][rk]=[];
-      sheetImages[name][rk].push({col:fromCol+1, data});
+      // 화면상 절대 위치(근사): 읽는 순서(위→아래, 좌→우) 정렬용
+      const absY=fromRow*0.21 + rowOff/914400;
+      const absX=fromCol*0.90 + colOff/914400;
+      list.push({row:fromRow+1, col:fromCol+1, absY, absX, data});
     }
-    // 각 행 안에서 열 순서대로 정렬 → 사진이 왼쪽→오른쪽 순으로 배치됨
-    for(const rk in sheetImages[name]){
-      sheetImages[name][rk].sort((a,b)=>a.col-b.col);
-    }
+    // ★시트의 모든 사진을 사람이 읽는 순서(위→아래 줄, 같은 줄이면 좌→우)로 정렬
+    list.sort((a,b)=>{
+      const bandA=Math.round(a.absY/0.8), bandB=Math.round(b.absY/0.8);
+      if(bandA!==bandB)return bandA-bandB;
+      return a.absX-b.absX;
+    });
+    sheetImages[name]={
+      __list:list,                          // 읽기순서로 정렬된 전체 사진(평면)
+      __byCell:{}                           // "행_열" → data (원래 칸 매칭용)
+    };
+    list.forEach(it=>{
+      const k=it.row+'_'+it.col;
+      if(!sheetImages[name].__byCell[k])sheetImages[name].__byCell[k]=[];
+      sheetImages[name].__byCell[k].push(it.data);
+    });
   }
 }
 
@@ -1048,8 +1062,9 @@ function buildSidebar(){
 
     recs.forEach((rec,i)=>{
       // 해당 교육 행(excelRow)에 모인 사진 개수 (행 단위 배열, 최대 6장 표시)
-      const _rowImgs=(sheetImages[name]&&sheetImages[name][String(rec.excelRow)])||[];
-      let pc=Math.min(_rowImgs.length,6);
+      // 이 회차에 실제 배치될 사진 수 (공용 헬퍼 기준, 최대 6장)
+      const _ph=getPhotosForRec(name,i);
+      let pc=_ph.filter(Boolean).length;
       const gidx=flatRecs.length;        // 전역 인덱스
       flatRecs.push({name,i});           // 매핑 등록
       const seq=String(i+1).padStart(2,'0');
@@ -1079,15 +1094,43 @@ function buildSidebar(){
   if(picked)selectRow(firstName,firstIdx);
 }
 
+// ── 회차(rec)에 들어갈 사진 6장 계산 (공용) ──
+// 1순위: 사진이 원래 칸(사진1~6 열)에 제대로 있으면 그걸 회차별로 정확히 매칭
+// 2순위: 사진이 칸 밖에 떠 있으면(매니저 시트 특성) 읽기순서대로 6장씩 회차에 배분
+function getPhotosForRec(name, i){
+  const si=sheetImages[name];
+  const rec=sheetData[name][i];
+  const out=[null,null,null,null,null,null];
+  if(!si)return out;
+  const pcols=sheetCols[name]?.photoAbsCols||[];
+  const byCell=si.__byCell||{};
+  // (1) 원래 칸 매칭 시도: 이 회차 행 + 사진열에 사진이 있나?
+  let cellHit=0;
+  for(let p=0;p<6;p++){
+    const c=pcols[p];
+    if(c){
+      const arr=byCell[rec.excelRow+'_'+c];
+      if(arr&&arr.length){ out[p]=arr[0]; cellHit++; }
+    }
+  }
+  if(cellHit>0)return out;   // 칸 매칭이 하나라도 되면 그 방식 신뢰
+  // (2) 칸 매칭 실패(사진이 떠다님) → 읽기순서 평면 리스트에서 회차순서대로 6장 배분
+  const list=si.__list||[];
+  // 이 회차가 시트에서 몇 번째 회차인지(사진 있는 회차 기준 순서)
+  const recs=sheetData[name]||[];
+  const myIndex=i;           // 회차 표시 순서 그대로 사용
+  const start=myIndex*6;
+  for(let p=0;p<6;p++){
+    const it=list[start+p];
+    out[p]=it?it.data:null;
+  }
+  return out;
+}
+
 // ── 보고서 렌더 ──
 function selectRow(name,i){
   const rec=sheetData[name][i];current={name,i,rec};
-  const imgs=[];
-  // 해당 교육 행에 모인 사진을 왼쪽→오른쪽(열 순) 순서대로 최대 6장 배치
-  const rowImgs=(sheetImages[name]&&sheetImages[name][String(rec.excelRow)])||[];
-  for(let p=0;p<6;p++){
-    imgs.push(rowImgs[p]?rowImgs[p].data:null);
-  }
+  const imgs=getPhotosForRec(name,i);
   let cells='';
   for(let p=0;p<6;p++){
     cells+=`<div class="r-photo-cell">${imgs[p]?`<img src="${imgs[p]}">`:''}</div>`;
@@ -1305,15 +1348,18 @@ async function pickSpreadsheet(){
   return new Promise((resolve,reject)=>{
     // ① 내 드라이브 (내가 소유 + 공유받은 파일 모두)
     const myView=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
-      .setIncludeFolders(true).setSelectFolderEnabled(false);
+      .setIncludeFolders(true).setSelectFolderEnabled(false)
+      .setLabel('① 내 드라이브');
     // ② 공유 드라이브(팀 드라이브)
     const sharedDrivesView=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
       .setIncludeFolders(true).setSelectFolderEnabled(false)
-      .setEnableDrives(true);
-    // ③ 나와 공유된 항목 (Shared with me)
+      .setEnableDrives(true)
+      .setLabel('② 공유 드라이브');
+    // ③ 나와 공유된 항목 (Shared with me) ← 매니저가 공유해준 파일은 여기!
     const sharedWithMeView=new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
       .setIncludeFolders(true).setSelectFolderEnabled(false)
-      .setOwnedByMe(false);
+      .setOwnedByMe(false)
+      .setLabel('③ 나와 공유된 파일 ★');
     const picker=new google.picker.PickerBuilder()
       .setAppId(GOOGLE_PROJECT_NUMBER)
       .setOAuthToken(token)
