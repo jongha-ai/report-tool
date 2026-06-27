@@ -977,11 +977,45 @@ async function extractImages(buf){
       const b64=await imgObj.async('base64');
       const ext=(imgTarget.split('.').pop()||'png').toLowerCase();
       const mime=ext==='jpg'||ext==='jpeg'?'image/jpeg':ext==='png'?'image/png':'image/'+ext;
-      const key=(fromRow+1)+'_'+(fromCol+1);    // 1-based row_col
-      // 같은 칸에 사진이 여러 벌 겹쳐 있으면, 나중 것(실제 사진)으로 덮어씀
-      sheetImages[name][key]=`data:${mime};base64,${b64}`;
+      const rawData=`data:${mime};base64,${b64}`;
+      // ★자동 압축: 큰 사진을 가로 max 1600px, JPEG 0.8로 줄여 용량 절감
+      const data=await compressImage(rawData);
+      // ★행 단위로 모든 사진 보존 (같은 칸 겹쳐도 덮어쓰지 않고 배열에 추가)
+      const rk=String(fromRow+1);               // 1-based row 키
+      if(!sheetImages[name][rk])sheetImages[name][rk]=[];
+      sheetImages[name][rk].push({col:fromCol+1, data});
+    }
+    // 각 행 안에서 열 순서대로 정렬 → 사진이 왼쪽→오른쪽 순으로 배치됨
+    for(const rk in sheetImages[name]){
+      sheetImages[name][rk].sort((a,b)=>a.col-b.col);
     }
   }
+}
+
+// ★사진 자동 압축: dataURL을 받아 가로 max 1600px로 리사이즈 + JPEG 재인코딩
+function compressImage(dataUrl, maxW=1600, quality=0.8){
+  return new Promise((resolve)=>{
+    try{
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+          if(!w||!h){resolve(dataUrl);return;}
+          if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+          const cv=document.createElement('canvas');
+          cv.width=w; cv.height=h;
+          const ctx=cv.getContext('2d');
+          ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h); // 투명 PNG 대비 흰 배경
+          ctx.drawImage(img,0,0,w,h);
+          const out=cv.toDataURL('image/jpeg',quality);
+          // 압축 결과가 원본보다 크면(드물게) 원본 유지
+          resolve(out.length<dataUrl.length?out:dataUrl);
+        }catch(e){ resolve(dataUrl); }
+      };
+      img.onerror=()=>resolve(dataUrl);
+      img.src=dataUrl;
+    }catch(e){ resolve(dataUrl); }
+  });
 }
 
 function loadJSZip(){
@@ -1013,8 +1047,9 @@ function buildSidebar(){
     group.innerHTML=`<div class="sb-glabel"><span class="pin">◉</span>${esc(name)}<span class="gc">${recs.length}개 회차</span></div>`;
 
     recs.forEach((rec,i)=>{
-      let pc=0;const pcols=sheetCols[name]?.photoAbsCols||[];
-      pcols.forEach(c=>{if(sheetImages[name]&&sheetImages[name][rec.excelRow+'_'+c])pc++;});
+      // 해당 교육 행(excelRow)에 모인 사진 개수 (행 단위 배열, 최대 6장 표시)
+      const _rowImgs=(sheetImages[name]&&sheetImages[name][String(rec.excelRow)])||[];
+      let pc=Math.min(_rowImgs.length,6);
       const gidx=flatRecs.length;        // 전역 인덱스
       flatRecs.push({name,i});           // 매핑 등록
       const seq=String(i+1).padStart(2,'0');
@@ -1048,10 +1083,10 @@ function buildSidebar(){
 function selectRow(name,i){
   const rec=sheetData[name][i];current={name,i,rec};
   const imgs=[];
-  const pcols=sheetCols[name]?.photoAbsCols||[];
+  // 해당 교육 행에 모인 사진을 왼쪽→오른쪽(열 순) 순서대로 최대 6장 배치
+  const rowImgs=(sheetImages[name]&&sheetImages[name][String(rec.excelRow)])||[];
   for(let p=0;p<6;p++){
-    const c=pcols[p];
-    imgs.push(c?(sheetImages[name]?.[rec.excelRow+'_'+c]||null):null);
+    imgs.push(rowImgs[p]?rowImgs[p].data:null);
   }
   let cells='';
   for(let p=0;p<6;p++){
